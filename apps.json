@@ -17,7 +17,18 @@
       "iconURL": "https://raw.githubusercontent.com/Revlog15/personal-life-assistant/main/docs/app-icon.png",
       "tintColor": "#0F766E",
       "screenshotURLs": [],
-      "versions": []
+      "versions": [
+        {
+          "version": "1.0.0",
+          "buildVersion": "6",
+          "date": "2026-11-25",
+          "localizedDescription": "Rilis Personal Life Assistant MVP (tugas, smart reminder, notifikasi rolling queue 64, keuangan, tagihan, analisis lokal, Face ID, backup JSON/CSV).",
+          "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v1.0.0/PLAApp-1.0.0.ipa",
+          "size": 1962673,
+          "minOSVersion": "17.0"
+        }
+      ],
+      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v1.0.0/PLAApp-1.0.0.ipa"
     }
   ],
   "news": []
