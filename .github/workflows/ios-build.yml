@@ -1,0 +1,170 @@
+name: iOS Build & Release (.ipa)
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: "Publish GitHub Release & update apps.json?"
+        type: boolean
+        default: false
+      release_version:
+        description: "Release version (e.g. 1.0.0) when publishing manually"
+        type: string
+        default: "1.0.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    name: Build Unsigned IPA & Verify PLACore + PLAData
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: |
+          if [ -d "/Applications/Xcode_16.4.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_16.4.app
+          fi
+          xcodebuild -version
+          swift --version
+
+      - name: Verify custom notification sounds (.caf <= 30s)
+        run: |
+          for f in App/PLAApp/Resources/Sounds/*.caf; do
+            echo "--- Checking $f ---"
+            afinfo "$f"
+            DUR=$(afinfo "$f" | awk '/estimated duration:/ { print $3 }')
+            python3 -c "d = float('${DUR}'); assert 0.2 <= d <= 30.0, f'Duration {d}s out of range'; print(f'Sound OK: ${f} ({d:.2f}s)')"
+          done
+
+      - name: Test PLACore (Darwin parity - V-13)
+        working-directory: Packages/PLACore
+        run: swift test --parallel
+
+      - name: Cache SPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            Packages/PLAData/.build
+            ~/Library/Caches/org.swift.swiftpm
+            build/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('Packages/PLAData/Package.swift', 'project.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Test PLAData (GRDB, Migrations & Benchmarks)
+        working-directory: Packages/PLAData
+        run: swift test
+
+      - name: Install XcodeGen & Generate Project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+          ls -la PersonalLifeAssistant.xcodeproj
+
+      - name: Determine Version & Build Number
+        id: meta
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.release_version }}" ]]; then
+            VERSION="${{ inputs.release_version }}"
+          else
+            VERSION="1.0.0"
+          fi
+          BUILD="${GITHUB_RUN_NUMBER}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "build=${BUILD}" >> "$GITHUB_OUTPUT"
+          echo "Building version ${VERSION} (build ${BUILD})"
+
+      - name: Archive Unsigned iOS App
+        run: |
+          xcodebuild archive \
+            -project PersonalLifeAssistant.xcodeproj \
+            -scheme PLAApp \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            -archivePath build/PLAApp.xcarchive \
+            MARKETING_VERSION="${{ steps.meta.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ steps.meta.outputs.build }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS=""
+
+      - name: Package Unsigned .ipa & Verify Bundle
+        id: package
+        run: |
+          rm -rf build/Payload build/PLAApp.ipa
+          mkdir -p build/Payload
+          cp -R build/PLAApp.xcarchive/Products/Applications/PLAApp.app build/Payload/PLAApp.app
+
+          for sound in pla_default.caf pla_urgent.caf pla_bill.caf pla_digest.caf; do
+            if [ ! -f "build/Payload/PLAApp.app/${sound}" ]; then
+              echo "ERROR: Missing notification sound ${sound} in PLAApp.app bundle!"
+              ls -la build/Payload/PLAApp.app/
+              exit 1
+            fi
+          done
+          echo "All 4 .caf notification sounds verified in bundle root."
+
+          (cd build && zip -r -y PLAApp.ipa Payload)
+          IPA_SIZE=$(stat -f%z build/PLAApp.ipa)
+          echo "size=${IPA_SIZE}" >> "$GITHUB_OUTPUT"
+          echo "PLAApp.ipa size: ${IPA_SIZE} bytes"
+
+          python3 -c "sz = int('${IPA_SIZE}'); mb = sz / (1024 * 1024); assert sz < 15 * 1024 * 1024, f'IPA {mb:.2f} MB >= 15 MB'; print(f'IPA size check PASSED: {mb:.2f} MB < 15.00 MB')"
+
+      - name: Upload Unsigned .ipa Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PLAApp-${{ steps.meta.outputs.version }}-b${{ steps.meta.outputs.build }}
+          path: build/PLAApp.ipa
+          retention-days: 30
+
+      - name: Create GitHub Release & Update SideStore apps.json
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.create_release)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.meta.outputs.version }}"
+          IPA_NAME="PLAApp-${{ steps.meta.outputs.version }}.ipa"
+          cp build/PLAApp.ipa "build/${IPA_NAME}"
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "build/${IPA_NAME}" --clobber
+          else
+            gh release create "${TAG}" "build/${IPA_NAME}" \
+              --title "Personal Life Assistant ${TAG}" \
+              --notes "Rilis unsigned IPA untuk SideStore (build ${{ steps.meta.outputs.build }}, minimum iOS 17.0). Lihat docs/INSTALL_TESTER.md untuk panduan instalasi."
+          fi
+
+          DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${IPA_NAME}"
+          python3 scripts/update_apps_json.py \
+            --apps-json apps.json \
+            --version "${{ steps.meta.outputs.version }}" \
+            --build "${{ steps.meta.outputs.build }}" \
+            --download-url "${DOWNLOAD_URL}" \
+            --size "${{ steps.package.outputs.size }}" \
+            --min-os "17.0"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          git add apps.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): update SideStore apps.json for ${TAG} [skip ci]"
+            git push origin main
+          fi

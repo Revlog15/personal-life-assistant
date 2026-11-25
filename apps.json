@@ -1,0 +1,24 @@
+{
+  "name": "Personal Life Assistant Source",
+  "identifier": "id.revand.pla.source",
+  "sourceURL": "https://raw.githubusercontent.com/Revlog15/personal-life-assistant/main/apps.json",
+  "subtitle": "Asisten pribadi iOS offline-first untuk tugas, tagihan, dan keuangan.",
+  "description": "Source resmi SideStore/AltStore untuk Personal Life Assistant (PLA). Semua pemrosesan berjalan 100% lokal di perangkat tanpa akun atau server.",
+  "iconURL": "https://raw.githubusercontent.com/Revlog15/personal-life-assistant/main/docs/app-icon.png",
+  "website": "https://github.com/Revlog15/personal-life-assistant",
+  "tintColor": "#0F766E",
+  "apps": [
+    {
+      "name": "Life Assistant",
+      "bundleIdentifier": "id.revand.pla",
+      "developerName": "Revand Anrian Putra",
+      "subtitle": "Tugas, pengingat otomatis, tagihan, dan keuangan pribadi — 100% lokal.",
+      "localizedDescription": "Personal Life Assistant (PLA) menggabungkan manajemen tugas dengan Smart Reminder otomatis, antrean notifikasi bergulir 64 slot, pelacakan tagihan berulang, dompet multi-akun, anggaran bulanan, analisis proyeksi pengeluaran deterministik, kunci Face ID, serta backup JSON/CSV via Files.\n\n• 100% offline dan privat (tanpa server/AI API eksternal)\n• Minimal input: buat tugas ≤ 3 tap, catat transaksi ≤ 4 tap, lunasi tagihan ≤ 2 tap\n• Suara notifikasi kustom dan pengingat masa berlaku sideload",
+      "iconURL": "https://raw.githubusercontent.com/Revlog15/personal-life-assistant/main/docs/app-icon.png",
+      "tintColor": "#0F766E",
+      "screenshotURLs": [],
+      "versions": []
+    }
+  ],
+  "news": []
+}

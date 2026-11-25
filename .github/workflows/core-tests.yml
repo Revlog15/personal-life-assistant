@@ -1,0 +1,45 @@
+name: Core Tests (Linux)
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  test-pla-core:
+    name: PLACore Unit Tests & Coverage
+    runs-on: ubuntu-latest
+    container:
+      image: swift:5.10-jammy
+    defaults:
+      run:
+        working-directory: Packages/PLACore
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Print Swift version
+        run: swift --version
+
+      - name: Build & Test PLACore with coverage
+        run: |
+          swift test --enable-code-coverage --parallel
+
+      - name: Enforce PLACore line coverage >= 85%
+        run: |
+          BIN_PATH=$(swift build --show-bin-path)
+          XCTEST_BIN="${BIN_PATH}/PLACorePackageTests.xctest"
+          PROFDATA="${BIN_PATH}/codecov/default.profdata"
+          echo "=== Coverage Report ==="
+          llvm-cov report "${XCTEST_BIN}" \
+            -instr-profile="${PROFDATA}" \
+            --ignore-filename-regex=".build|Tests" \
+            --use-color=false
+          TOTAL_LINE_COV=$(llvm-cov report "${XCTEST_BIN}" \
+            -instr-profile="${PROFDATA}" \
+            --ignore-filename-regex=".build|Tests" \
+            --use-color=false | awk '/^TOTAL/ { gsub(/%/, "", $10); print $10 }')
+          echo "Total PLACore line coverage: ${TOTAL_LINE_COV}%"
+          awk -v cov="${TOTAL_LINE_COV}" 'BEGIN { if (cov + 0 < 85.0) { printf("FAIL: coverage %.2f%% < 85.0%%\n", cov); exit 1 } else { printf("PASS: coverage %.2f%% >= 85.0%%\n", cov) } }'
