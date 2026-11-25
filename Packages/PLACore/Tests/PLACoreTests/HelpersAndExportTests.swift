@@ -30,8 +30,8 @@ final class HelpersAndExportTests: XCTestCase {
 
     func testCategorySuggesterMatchesNoteAfterTwoHistoricalEntries() {
         // AC-08.2
-        let catFood = Category(name: "Makan & Minum", scope: .expense, sortOrder: 1)
-        let catTrans = Category(name: "Transportasi", scope: .expense, sortOrder: 2)
+        let catFood = PLACategory(name: "Makan & Minum", scope: .expense, sortOrder: 1)
+        let catTrans = PLACategory(name: "Transportasi", scope: .expense, sortOrder: 2)
         let acc = UUID()
         let d = LocalDate(year: 2026, month: 11, day: 10)!
 
@@ -78,7 +78,7 @@ final class HelpersAndExportTests: XCTestCase {
         // SC-14 & AC-13.1/13.3
         let ts = Date(timeIntervalSince1970: 1_795_620_000)
         let acc = Account(name: "BCA", type: .bank, initialBalance: 2_000_000, isDefault: true, createdAt: ts)
-        let cat = Category(name: "Makan & Minum", scope: .expense, isSystem: true)
+        let cat = PLACategory(name: "Makan & Minum", scope: .expense, isSystem: true)
         let rule = RecurrenceRule(frequency: .monthly, interval: 1, anchorDayOfMonth: 15)
         let task = PLATask(title: "Bayar pajak", dueDateLocal: LocalDate(year: 2026, month: 12, day: 1)!, priority: .high, createdAt: ts, updatedAt: ts)
         let bill = Bill(name: "Internet", amount: 350_000, nextDueDateLocal: LocalDate(year: 2026, month: 12, day: 15)!, recurrenceRuleId: rule.id, defaultAccountId: acc.id, categoryId: cat.id, createdAt: ts, updatedAt: ts)
@@ -149,7 +149,7 @@ final class HelpersAndExportTests: XCTestCase {
         // AC-13.2
         let acc1 = Account(name: "BCA", type: .bank)
         let acc2 = Account(name: "GoPay", type: .ewallet)
-        let cat = Category(name: "Makan & Minum", scope: .expense)
+        let cat = PLACategory(name: "Makan & Minum", scope: .expense)
         let billId = UUID()
 
         let tx1 = PLATransaction(

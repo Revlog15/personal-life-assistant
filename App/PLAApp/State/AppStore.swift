@@ -14,14 +14,14 @@ final class AppStore {
     let authService: AuthService
     let notificationAdapter: NotificationAdapter
     let backgroundRefresh: BackgroundRefreshService
-    let clock: any Clock
+    let clock: any PLAClock
 
     // Domain snapshots
     var tasks: [PLATask] = []
     var reminders: [Reminder] = []
     var recurrenceRules: [RecurrenceRule] = []
     var accounts: [Account] = []
-    var categories: [Category] = []
+    var categories: [PLACategory] = []
     var transactions: [PLATransaction] = []
     var budgets: [Budget] = []
     var bills: [Bill] = []
@@ -42,7 +42,7 @@ final class AppStore {
 
     private var systemObservers: [NSObjectProtocol] = []
 
-    init(clock: any Clock = SystemClock()) {
+    init(clock: any PLAClock = SystemClock()) {
         self.clock = clock
         self.settingsStore = SettingsStore()
         self.diagnostics = DiagnosticsService()
@@ -130,19 +130,19 @@ final class AppStore {
         activeAccounts.first(where: \.isDefault) ?? activeAccounts.first
     }
 
-    var expenseCategories: [Category] {
+    var expenseCategories: [PLACategory] {
         categories.filter { $0.scope == .expense && !$0.isArchived }
     }
 
-    var incomeCategories: [Category] {
+    var incomeCategories: [PLACategory] {
         categories.filter { $0.scope == .income && !$0.isArchived }
     }
 
-    var taskCategories: [Category] {
+    var taskCategories: [PLACategory] {
         categories.filter { $0.scope == .task && !$0.isArchived }
     }
 
-    var defaultTaskCategory: Category? {
+    var defaultTaskCategory: PLACategory? {
         taskCategories.first { $0.name == "Umum" } ?? taskCategories.first
     }
 

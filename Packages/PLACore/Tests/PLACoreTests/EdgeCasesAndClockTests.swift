@@ -111,7 +111,7 @@ final class EdgeCasesAndClockTests: XCTestCase {
 
     func testForecastColdStartBoundaryDay4VsDay5AndTx4VsTx5() {
         let acc = Account(name: "Cash", type: .cash)
-        let cat = Category(name: "Makan", scope: .expense)
+        let cat = PLACategory(name: "Makan", scope: .expense)
         let budget = Budget(categoryId: nil, amount: 1_000_000, effectiveFromMonth: "2026-11")
 
         // Day 4 with 5 tx -> NOT ready
@@ -164,8 +164,8 @@ final class EdgeCasesAndClockTests: XCTestCase {
     }
 
     func testCategorySuggesterExcludesArchivedCategories() {
-        let archived = Category(name: "Kopi Lama", scope: .expense, isArchived: true)
-        let active = Category(name: "Makan", scope: .expense, isArchived: false)
+        let archived = PLACategory(name: "Kopi Lama", scope: .expense, isArchived: true)
+        let active = PLACategory(name: "Makan", scope: .expense, isArchived: false)
         let acc = UUID()
         let d = LocalDate(year: 2026, month: 11, day: 10)!
         let history = [

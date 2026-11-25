@@ -5,7 +5,7 @@ public struct BackupPayload: Equatable, Codable, Sendable {
     public var reminders: [Reminder]
     public var recurrenceRules: [RecurrenceRule]
     public var accounts: [Account]
-    public var categories: [Category]
+    public var categories: [PLACategory]
     public var transactions: [PLATransaction]
     public var budgets: [Budget]
     public var bills: [Bill]
@@ -17,7 +17,7 @@ public struct BackupPayload: Equatable, Codable, Sendable {
         reminders: [Reminder] = [],
         recurrenceRules: [RecurrenceRule] = [],
         accounts: [Account] = [],
-        categories: [Category] = [],
+        categories: [PLACategory] = [],
         transactions: [PLATransaction] = [],
         budgets: [Budget] = [],
         bills: [Bill] = [],

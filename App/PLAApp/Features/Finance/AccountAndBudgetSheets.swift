@@ -128,12 +128,12 @@ struct BudgetFormSheet: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
 
-    let category: Category?
+    let category: PLACategory?
     let currentAmount: Int64?
 
     @State private var amountText: String
 
-    init(category: Category?, currentAmount: Int64?) {
+    init(category: PLACategory?, currentAmount: Int64?) {
         self.category = category
         self.currentAmount = currentAmount
         _amountText = State(initialValue: currentAmount.map { String($0) } ?? "")

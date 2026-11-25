@@ -45,7 +45,7 @@ struct FinanceView: View {
     @State private var showAddAccount = false
     @State private var editingAccount: Account?
     @State private var showTotalBudgetSheet = false
-    @State private var categoryForBudget: Category?
+    @State private var categoryForBudget: PLACategory?
     @State private var showArchivedAccounts = false
 
     var body: some View {

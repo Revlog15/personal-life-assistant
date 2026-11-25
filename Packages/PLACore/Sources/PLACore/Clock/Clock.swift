@@ -1,12 +1,12 @@
 @preconcurrency import Foundation
 
-public protocol Clock: Sendable {
+public protocol PLAClock: Sendable {
     var now: Date { get }
     var timeZone: TimeZone { get }
     var calendar: Calendar { get }
 }
 
-public extension Clock {
+public extension PLAClock {
     var today: LocalDate {
         LocalDate.from(date: now, timeZone: timeZone)
     }
@@ -16,7 +16,7 @@ public extension Clock {
     }
 }
 
-public struct SystemClock: Clock {
+public struct SystemClock: PLAClock {
     public init() {}
 
     public var now: Date { Date() }
@@ -31,7 +31,7 @@ public struct SystemClock: Clock {
     }
 }
 
-public struct FixedClock: Clock {
+public struct FixedClock: PLAClock {
     public let now: Date
     public let timeZone: TimeZone
 

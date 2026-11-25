@@ -36,11 +36,11 @@ struct TransactionFormSheet: View {
         AmountParser.parse(amountText)
     }
 
-    private var availableCategories: [Category] {
+    private var availableCategories: [PLACategory] {
         txType == .income ? store.incomeCategories : store.expenseCategories
     }
 
-    private var suggestedCategories: [Category] {
+    private var suggestedCategories: [PLACategory] {
         CategorySuggester.suggestCategories(
             forNote: note,
             scope: txType == .income ? .income : .expense,

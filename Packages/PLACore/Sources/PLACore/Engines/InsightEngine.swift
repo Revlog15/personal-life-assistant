@@ -65,7 +65,7 @@ public enum InsightEngine {
         today: LocalDate,
         cycleStartDay: Int,
         allTransactions: [PLATransaction],
-        categories: [Category],
+        categories: [PLACategory],
         existingRecords: [InsightRecord] = [],
         maxCards: Int = maxDashboardCards
     ) -> [FinancialInsight] {

@@ -4,10 +4,10 @@ import XCTest
 final class BudgetAndInsightEngineTests: XCTestCase {
     private let accCash = Account(name: "Tunai", type: .cash, initialBalance: 500_000, isDefault: true)
     private let accBank = Account(name: "BCA", type: .bank, initialBalance: 5_000_000)
-    private let catFood = Category(name: "Makan & Minum", scope: .expense)
-    private let catTransport = Category(name: "Transportasi", scope: .expense)
-    private let catBills = Category(name: "Tagihan & Utilitas", scope: .expense)
-    private let catSalary = Category(name: "Gaji", scope: .income)
+    private let catFood = PLACategory(name: "Makan & Minum", scope: .expense)
+    private let catTransport = PLACategory(name: "Transportasi", scope: .expense)
+    private let catBills = PLACategory(name: "Tagihan & Utilitas", scope: .expense)
+    private let catSalary = PLACategory(name: "Gaji", scope: .income)
 
     func testPRDExample1NearLimitExactNumbers() {
         // PRD §10.1 Contoh 1:

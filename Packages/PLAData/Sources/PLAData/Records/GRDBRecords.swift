@@ -15,7 +15,7 @@ struct CategoryRecord: Codable, FetchableRecord, PersistableRecord {
     var isArchived: Bool
     var sortOrder: Int
 
-    init(domain: Category) {
+    init(domain: PLACategory) {
         self.id = domain.id.uuidString
         self.name = domain.name
         self.scope = domain.scope.rawValue
@@ -26,11 +26,11 @@ struct CategoryRecord: Codable, FetchableRecord, PersistableRecord {
         self.sortOrder = domain.sortOrder
     }
 
-    func toDomain() throws -> Category {
+    func toDomain() throws -> PLACategory {
         guard let uuid = UUID(uuidString: id), let sc = CategoryScope(rawValue: scope) else {
             throw PLADatabaseError.invalidStoredIdentifier(id)
         }
-        return Category(
+        return PLACategory(
             id: uuid, name: name, scope: sc, iconName: iconName,
             colorToken: colorToken, isSystem: isSystem, isArchived: isArchived, sortOrder: sortOrder
         )

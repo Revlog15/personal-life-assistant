@@ -7,7 +7,7 @@ public enum CSVExporter {
     public static func exportTransactions(
         transactions: [PLATransaction],
         accounts: [Account],
-        categories: [Category],
+        categories: [PLACategory],
         from startDate: LocalDate? = nil,
         to endDate: LocalDate? = nil
     ) -> Data {

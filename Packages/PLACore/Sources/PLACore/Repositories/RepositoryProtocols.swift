@@ -22,8 +22,8 @@ public protocol FinanceRepository: Sendable {
     func archiveAccount(id: UUID) throws
     func deleteAccount(id: UUID) throws
 
-    func fetchAllCategories() throws -> [Category]
-    func saveCategory(_ category: Category) throws
+    func fetchAllCategories() throws -> [PLACategory]
+    func saveCategory(_ category: PLACategory) throws
     func archiveCategory(id: UUID) throws
 
     func fetchAllTransactions() throws -> [PLATransaction]

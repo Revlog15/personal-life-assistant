@@ -6,9 +6,9 @@ public enum CategorySuggester {
         forNote note: String,
         scope: CategoryScope,
         transactions: [PLATransaction],
-        categories: [Category],
+        categories: [PLACategory],
         limit: Int = 3
-    ) -> [Category] {
+    ) -> [PLACategory] {
         let activeCategories = categories.filter { $0.scope == scope && !$0.isArchived }
         let categoryById = Dictionary(uniqueKeysWithValues: activeCategories.map { ($0.id, $0) })
 

@@ -182,7 +182,7 @@ public enum BudgetCalculator {
         transactions: [PLATransaction],
         budgets: [Budget],
         bills: [Bill],
-        categories: [Category]
+        categories: [PLACategory]
     ) -> FinancialPeriodSummary {
         let period = BudgetPeriod.current(for: today, cycleStartDay: cycleStartDay)
         return summarize(
@@ -201,7 +201,7 @@ public enum BudgetCalculator {
         transactions: [PLATransaction],
         budgets: [Budget],
         bills: [Bill],
-        categories: [Category]
+        categories: [PLACategory]
     ) -> FinancialPeriodSummary {
         let effectiveEnd = min(asOfDate, period.end)
 

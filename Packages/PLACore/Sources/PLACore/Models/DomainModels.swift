@@ -221,7 +221,7 @@ public enum CategoryScope: Int, Codable, CaseIterable, Sendable {
     case task = 2
 }
 
-public struct Category: Identifiable, Hashable, Codable, Sendable {
+public struct PLACategory: Identifiable, Hashable, Codable, Sendable {
     public let id: UUID
     public var name: String
     public var scope: CategoryScope

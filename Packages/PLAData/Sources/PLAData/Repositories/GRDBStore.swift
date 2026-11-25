@@ -211,14 +211,14 @@ public final class GRDBStore: TaskRepository, ReminderRepository, FinanceReposit
         }
     }
 
-    public func fetchAllCategories() throws -> [Category] {
+    public func fetchAllCategories() throws -> [PLACategory] {
         try dbWriter.read { db in
             let rows = try CategoryRecord.fetchAll(db, sql: "SELECT * FROM categories ORDER BY scope ASC, sortOrder ASC, name ASC")
             return try rows.map { try $0.toDomain() }
         }
     }
 
-    public func saveCategory(_ category: Category) throws {
+    public func saveCategory(_ category: PLACategory) throws {
         try dbWriter.write { db in
             try CategoryRecord(domain: category).save(db)
         }
