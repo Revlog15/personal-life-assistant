@@ -88,7 +88,7 @@ struct TaskFormSheet: View {
                 }
 
                 // Quick deadline chips (AC-02.2)
-                Section("Deadline & Smart Reminder") {
+                Section {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: PLATokens.Spacing.sm) {
                             quickDateChip("Tanpa Tanggal", isSelected: !hasDueDate) {
@@ -118,6 +118,8 @@ struct TaskFormSheet: View {
                             DatePicker("Jam", selection: $selectedTime, displayedComponents: .hourAndMinute)
                         }
                     }
+                } header: {
+                    Text("Deadline & Smart Reminder")
                 } footer: {
                     if let previewText = smartReminderSummary {
                         Text(previewText)

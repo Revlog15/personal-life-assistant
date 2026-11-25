@@ -71,7 +71,7 @@ struct TransferFormSheet: View {
                         }
                     }
 
-                    Section("Nominal Transfer") {
+                    Section {
                         TextField("Nominal transfer (mis. 500.000)", text: $amountText)
                             .font(.title3.weight(.bold))
                             .monospacedDigit()
@@ -95,6 +95,8 @@ struct TransferFormSheet: View {
 
                         DatePicker("Tanggal", selection: $selectedDate, displayedComponents: .date)
                         TextField("Catatan (opsional)", text: $note)
+                    } header: {
+                        Text("Nominal Transfer")
                     } footer: {
                         Text("Nominal transfer tidak dihitung sebagai pengeluaran atau pemakaian anggaran. Jika biaya admin diisi, biaya tersebut dicatat sebagai pengeluaran kategori Biaya Admin.")
                     }

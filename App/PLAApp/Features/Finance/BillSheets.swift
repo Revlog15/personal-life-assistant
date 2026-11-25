@@ -60,7 +60,7 @@ struct BillFormSheet: View {
                     Toggle("Nominal Variabel (berubah tiap bulan)", isOn: $isVariableAmount)
                 }
 
-                Section("Jadwal & Siklus") {
+                Section {
                     DatePicker("Jatuh Tempo Berikutnya", selection: $dueDate, displayedComponents: .date)
                     Picker("Siklus", selection: $frequency) {
                         Text("Mingguan").tag(RecurrenceFrequency.weekly)
@@ -68,6 +68,8 @@ struct BillFormSheet: View {
                         Text("Tahunan").tag(RecurrenceFrequency.yearly)
                     }
                     .pickerStyle(.segmented)
+                } header: {
+                    Text("Jadwal & Siklus")
                 } footer: {
                     Text("Pengingat otomatis akan dijadwalkan pada H-3, H-1, dan Hari H dengan suara kustom tagihan.")
                 }

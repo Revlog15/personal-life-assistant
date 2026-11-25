@@ -146,7 +146,7 @@ struct BudgetFormSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(category == nil ? "Anggaran Total Bulanan" : "Anggaran Kategori: \(category?.name ?? "")") {
+                Section {
                     TextField("Contoh: 3.000.000", text: $amountText)
                         .font(.title3.weight(.bold))
                         .monospacedDigit()
@@ -164,6 +164,8 @@ struct BudgetFormSheet: View {
                                 .foregroundStyle(PLATokens.Colors.danger)
                         }
                     }
+                } header: {
+                    Text(category == nil ? "Anggaran Total Bulanan" : "Anggaran Kategori: \(category?.name ?? "")")
                 } footer: {
                     Text("Berlaku mulai periode \(store.activePeriod.periodKey) ke depan tanpa mengubah histori bulan sebelumnya.")
                 }

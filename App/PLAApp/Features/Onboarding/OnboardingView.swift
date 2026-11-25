@@ -92,7 +92,7 @@ struct OnboardingView: View {
             }
         }
 
-        Section("Saldo Awal (Opsional)") {
+        Section {
             VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                 Label("Tunai", systemImage: "banknote.fill")
                     .font(.subheadline.weight(.medium))
@@ -105,6 +105,8 @@ struct OnboardingView: View {
                 TextField("Contoh: 2500000 (kosongkan jika Rp0)", text: $bankText)
                     .keyboardType(.numberPad)
             }
+        } header: {
+            Text("Saldo Awal (Opsional)")
         } footer: {
             Text("Akun E-wallet dan rekening tambahan dapat ditambahkan kapan saja di tab Keuangan.")
         }
@@ -118,7 +120,7 @@ struct OnboardingView: View {
                 .foregroundStyle(.secondary)
         }
 
-        Section("Batas Anggaran Total (Opsional)") {
+        Section {
             TextField("Contoh: 3000000", text: $budgetText)
                 .keyboardType(.numberPad)
             if let parsed = parseOptionalPositiveAmount(budgetText) {
@@ -126,6 +128,8 @@ struct OnboardingView: View {
                     .font(.footnote)
                     .foregroundStyle(PLATokens.Colors.accent)
             }
+        } header: {
+            Text("Batas Anggaran Total (Opsional)")
         } footer: {
             Text("Siklus default dimulai tanggal 1 setiap bulan. Anda dapat mengubah ke tanggal gajian (1–28) di Pengaturan.")
         }

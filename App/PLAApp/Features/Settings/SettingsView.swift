@@ -65,39 +65,7 @@ struct SettingsView: View {
                 }
 
                 // 2. Budget Cycle & Security
-                Section("Keuangan & Keamanan") {
-                    Stepper(
-                        "Mulai Siklus Anggaran: Tanggal \(store.settings.budgetCycleStartDay)",
-                        value: Binding(
-                            get: { store.settings.budgetCycleStartDay },
-                            set: { val in store.updateSettings { $0.budgetCycleStartDay = val } }
-                        ),
-                        in: 1...28
-                    )
-
-                    Toggle("Kunci Tab Keuangan (\(store.authService.biometryDisplayName()))", isOn: Binding(
-                        get: { store.settings.financeLockEnabled },
-                        set: { val in store.updateSettings { $0.financeLockEnabled = val } }
-                    ))
-
-                    if store.settings.financeLockEnabled {
-                        Picker("Kunci Otomatis Saat Keluar", selection: Binding(
-                            get: { store.settings.autoLockTimeout },
-                            set: { val in store.updateSettings { $0.autoLockTimeout = val } }
-                        )) {
-                            Text("Segera").tag(AutoLockTimeout.immediate)
-                            Text("1 Menit").tag(AutoLockTimeout.oneMinute)
-                            Text("5 Menit").tag(AutoLockTimeout.fiveMinutes)
-                        }
-
-                        Toggle("Tampilkan Status Anggaran Saat Terkunci", isOn: Binding(
-                            get: { store.settings.showBudgetStatusWhenLocked },
-                            set: { val in store.updateSettings { $0.showBudgetStatusWhenLocked = val } }
-                        ))
-                    }
-                } footer: {
-                    Text("Periode aktif saat ini: \(PLAFormatters.periodRange(store.activePeriod)). Kunci Keuangan otomatis mendukung cadangan Passcode perangkat.")
-                }
+                financeAndSecuritySection
 
                 // 3. Data & Backup via iOS Files (F-13)
                 Section {
@@ -135,33 +103,7 @@ struct SettingsView: View {
                 }
 
                 // 5. About & Sideload Expiry (AC-14.1)
-                Section("Tentang Aplikasi") {
-                    AdaptiveKeyValueRow {
-                        Text("Versi")
-                    } trailing: {
-                        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
-                        let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-                        Text("\(v) (Build \(b))")
-                            .foregroundStyle(.secondary)
-                    }
-
-                    AdaptiveKeyValueRow {
-                        Text("Masa Berlaku Sideload")
-                    } trailing: {
-                        Text(store.sideloadInfo.summaryText(today: store.today))
-                            .font(.footnote)
-                            .foregroundStyle(store.sideloadInfo.shouldShowBanner(on: store.today) ? PLATokens.Colors.warning : .secondary)
-                            .multilineTextAlignment(.trailing)
-                    }
-
-                    AdaptiveKeyValueRow {
-                        Text("Privasi")
-                    } trailing: {
-                        Text("100% Lokal & Offline")
-                            .font(.footnote.weight(.medium))
-                            .foregroundStyle(PLATokens.Colors.safe)
-                    }
-                }
+                aboutSection
             }
             .navigationTitle("Pengaturan")
             // JSON Backup FileExporter (AC-13.1)
@@ -220,6 +162,76 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private var financeAndSecuritySection: some View {
+        Section {
+            Stepper(
+                "Mulai Siklus Anggaran: Tanggal \(store.settings.budgetCycleStartDay)",
+                value: Binding(
+                    get: { store.settings.budgetCycleStartDay },
+                    set: { val in store.updateSettings { $0.budgetCycleStartDay = val } }
+                ),
+                in: 1...28
+            )
+
+            Toggle("Kunci Tab Keuangan (\(store.authService.biometryDisplayName()))", isOn: Binding(
+                get: { store.settings.financeLockEnabled },
+                set: { val in store.updateSettings { $0.financeLockEnabled = val } }
+            ))
+
+            if store.settings.financeLockEnabled {
+                Picker("Kunci Otomatis Saat Keluar", selection: Binding(
+                    get: { store.settings.autoLockTimeout },
+                    set: { val in store.updateSettings { $0.autoLockTimeout = val } }
+                )) {
+                    Text("Segera").tag(AutoLockTimeout.immediate)
+                    Text("1 Menit").tag(AutoLockTimeout.oneMinute)
+                    Text("5 Menit").tag(AutoLockTimeout.fiveMinutes)
+                }
+
+                Toggle("Tampilkan Status Anggaran Saat Terkunci", isOn: Binding(
+                    get: { store.settings.showBudgetStatusWhenLocked },
+                    set: { val in store.updateSettings { $0.showBudgetStatusWhenLocked = val } }
+                ))
+            }
+        } header: {
+            Text("Keuangan & Keamanan")
+        } footer: {
+            Text("Periode aktif saat ini: \(PLAFormatters.periodRange(store.activePeriod)). Kunci Keuangan otomatis mendukung cadangan Passcode perangkat.")
+        }
+    }
+
+    @ViewBuilder
+    private var aboutSection: some View {
+        Section("Tentang Aplikasi") {
+            AdaptiveKeyValueRow {
+                Text("Versi")
+            } trailing: {
+                let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+                let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+                Text("\(v) (Build \(b))")
+                    .foregroundStyle(.secondary)
+            }
+
+            AdaptiveKeyValueRow {
+                Text("Masa Berlaku Sideload")
+            } trailing: {
+                Text(store.sideloadInfo.summaryText(today: store.today))
+                    .font(.footnote)
+                    .foregroundStyle(store.sideloadInfo.shouldShowBanner(on: store.today) ? PLATokens.Colors.warning : .secondary)
+                    .multilineTextAlignment(.trailing)
+            }
+
+            AdaptiveKeyValueRow {
+                Text("Privasi")
+            } trailing: {
+                Text("100% Lokal & Offline")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(PLATokens.Colors.safe)
+            }
+        }
+    }
+
     private func prepareJSONBackup() {
         do {
             let data = try store.exportBackupJSON()
@@ -257,9 +269,11 @@ struct SettingsView: View {
     private var csvExportRangeSheet: some View {
         NavigationStack {
             Form {
-                Section("Rentang Tanggal Transaksi") {
+                Section {
                     DatePicker("Dari Tanggal", selection: $csvStartDate, displayedComponents: .date)
                     DatePicker("Sampai Tanggal", selection: $csvEndDate, displayedComponents: .date)
+                } header: {
+                    Text("Rentang Tanggal Transaksi")
                 } footer: {
                     Text("Format UTF-8 dengan BOM agar rapi dibuka langsung di Microsoft Excel Windows maupun Apple Numbers.")
                 }
@@ -379,11 +393,13 @@ struct NotificationSettingsDetailView: View {
                 Toggle("Tagihan: Hari H (08.00)", isOn: prefBinding(\.billEnableDayOf))
             }
 
-            Section("Suara Kustom (.caf)") {
+            Section {
                 soundPickerRow("Tugas Standar", keyPath: \.defaultTaskSound)
                 soundPickerRow("Tugas Prioritas Tinggi", keyPath: \.urgentTaskSound)
                 soundPickerRow("Tagihan", keyPath: \.billSound)
                 soundPickerRow("Ringkasan Pagi", keyPath: \.digestSound)
+            } header: {
+                Text("Suara Kustom (.caf)")
             } footer: {
                 Text("Ketuk ikon speaker untuk mendengar pratinjau suara notifikasi. Perubahan pola Smart Reminder berlaku untuk tugas baru.")
             }

@@ -828,7 +828,7 @@ struct FinanceView: View {
                                 Label(cat.name, systemImage: cat.iconName)
                                     .foregroundStyle(.primary)
                             } trailing: {
-                                if let b = catSum?.budgetAmount, let pct = catSum?.percentageOfBudget {
+                                if catSum?.budgetAmount != nil, let pct = catSum?.percentageOfBudget {
                                     StatusBadge(
                                         text: "\(PLATokens.label(for: catSum?.status ?? .safe)) • \(Int((pct * 100).rounded()))%",
                                         icon: PLATokens.icon(for: catSum?.status ?? .safe),

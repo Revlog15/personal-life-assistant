@@ -11,7 +11,7 @@ struct DiagnosticsView: View {
     var body: some View {
         Form {
             // 1. Sideload Certificate Health (AC-14.1, V-16)
-            Section("Masa Berlaku Sideload (SideStore)") {
+            Section {
                 AdaptiveKeyValueRow {
                     Text("Status Sertifikat")
                 } trailing: {
@@ -35,6 +35,8 @@ struct DiagnosticsView: View {
                 } label: {
                     Label("Catat Refresh SideStore Hari Ini (+7 Hari)", systemImage: "arrow.clockwise.circle")
                 }
+            } header: {
+                Text("Masa Berlaku Sideload (SideStore)")
             } footer: {
                 Text("Jika embedded.mobileprovision tidak terbaca di perangkat, gunakan tombol di atas setelah refresh di SideStore untuk mengaktifkan pengingat H-2 & H-1.")
             }
