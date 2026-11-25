@@ -191,14 +191,14 @@ struct ComponentCatalogView: View {
         List {
             Section("Status Badges (Ikon + Teks)") {
                 HStack(spacing: PLATokens.Spacing.sm) {
-                    StatusBadge(text: "Aman", icon: PLATokens.icon(for: .safe), color: PLATokens.Colors.safe)
-                    StatusBadge(text: "Waspada", icon: PLATokens.icon(for: .warning), color: PLATokens.Colors.warning)
-                    StatusBadge(text: "Melebihi", icon: PLATokens.icon(for: .exceeded), color: PLATokens.Colors.danger)
+                    StatusBadge(text: "Aman", icon: PLATokens.icon(for: BudgetHealthStatus.safe), color: PLATokens.Colors.safe)
+                    StatusBadge(text: "Waspada", icon: PLATokens.icon(for: BudgetHealthStatus.warning), color: PLATokens.Colors.warning)
+                    StatusBadge(text: "Melebihi", icon: PLATokens.icon(for: BudgetHealthStatus.exceeded), color: PLATokens.Colors.danger)
                 }
                 HStack(spacing: PLATokens.Spacing.sm) {
-                    StatusBadge(text: "Tinggi", icon: PLATokens.icon(for: .high), color: PLATokens.Colors.danger)
-                    StatusBadge(text: "Sedang", icon: PLATokens.icon(for: .medium), color: PLATokens.Colors.warning)
-                    StatusBadge(text: "Rendah", icon: PLATokens.icon(for: .low), color: .secondary)
+                    StatusBadge(text: "Tinggi", icon: PLATokens.icon(for: TaskPriority.high), color: PLATokens.Colors.danger)
+                    StatusBadge(text: "Sedang", icon: PLATokens.icon(for: TaskPriority.medium), color: PLATokens.Colors.warning)
+                    StatusBadge(text: "Rendah", icon: PLATokens.icon(for: TaskPriority.low), color: .secondary)
                 }
             }
 

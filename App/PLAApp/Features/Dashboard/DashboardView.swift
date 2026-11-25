@@ -289,7 +289,7 @@ struct DashboardView: View {
             }
             Spacer()
             if task.priority == .high {
-                StatusBadge(text: "Tinggi", icon: PLATokens.icon(for: .high), color: PLATokens.Colors.danger)
+                StatusBadge(text: "Tinggi", icon: PLATokens.icon(for: TaskPriority.high), color: PLATokens.Colors.danger)
             }
         }
     }
