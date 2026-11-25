@@ -76,15 +76,16 @@ final class HelpersAndExportTests: XCTestCase {
 
     func testBackupCodecRoundTripIdenticalDataAndWealth() throws {
         // SC-14 & AC-13.1/13.3
-        let acc = Account(name: "BCA", type: .bank, initialBalance: 2_000_000, isDefault: true)
+        let ts = Date(timeIntervalSince1970: 1_795_620_000)
+        let acc = Account(name: "BCA", type: .bank, initialBalance: 2_000_000, isDefault: true, createdAt: ts)
         let cat = Category(name: "Makan & Minum", scope: .expense, isSystem: true)
         let rule = RecurrenceRule(frequency: .monthly, interval: 1, anchorDayOfMonth: 15)
-        let task = PLATask(title: "Bayar pajak", dueDateLocal: LocalDate(year: 2026, month: 12, day: 1)!, priority: .high)
-        let bill = Bill(name: "Internet", amount: 350_000, nextDueDateLocal: LocalDate(year: 2026, month: 12, day: 15)!, recurrenceRuleId: rule.id, defaultAccountId: acc.id, categoryId: cat.id)
-        let tx = PLATransaction(type: .expense, amount: 150_000, accountId: acc.id, categoryId: cat.id, dateLocal: LocalDate(year: 2026, month: 11, day: 25)!, note: "Makan siang")
-        let budget = Budget(categoryId: nil, amount: 3_000_000, effectiveFromMonth: "2026-11")
+        let task = PLATask(title: "Bayar pajak", dueDateLocal: LocalDate(year: 2026, month: 12, day: 1)!, priority: .high, createdAt: ts, updatedAt: ts)
+        let bill = Bill(name: "Internet", amount: 350_000, nextDueDateLocal: LocalDate(year: 2026, month: 12, day: 15)!, recurrenceRuleId: rule.id, defaultAccountId: acc.id, categoryId: cat.id, createdAt: ts, updatedAt: ts)
+        let tx = PLATransaction(type: .expense, amount: 150_000, accountId: acc.id, categoryId: cat.id, dateLocal: LocalDate(year: 2026, month: 11, day: 25)!, note: "Makan siang", createdAt: ts, updatedAt: ts)
+        let budget = Budget(categoryId: nil, amount: 3_000_000, effectiveFromMonth: "2026-11", createdAt: ts, updatedAt: ts)
         let reminder = Reminder(ownerType: .task, ownerId: task.id, fireDateLocal: LocalDateTime(date: LocalDate(year: 2026, month: 12, day: 1)!, hour: 8, minute: 0))
-        let insight = InsightRecord(ruleCode: "R-FIN-05c", periodKey: "2026-11", severity: .info, feedback: 1)
+        let insight = InsightRecord(ruleCode: "R-FIN-05c", periodKey: "2026-11", severity: .info, feedback: 1, generatedAt: ts)
 
         let payload = BackupPayload(
             tasks: [task],
@@ -99,8 +100,7 @@ final class HelpersAndExportTests: XCTestCase {
             settings: UserSettings(budgetCycleStartDay: 25, hasCompletedOnboarding: true)
         )
 
-        let exportedAt = Date(timeIntervalSince1970: 1_795_620_000)
-        let data = try BackupCodec.encode(payload: payload, exportedAt: exportedAt)
+        let data = try BackupCodec.encode(payload: payload, exportedAt: ts)
         let decoded = BackupCodec.decodeAndValidate(data: data)
 
         switch decoded {
