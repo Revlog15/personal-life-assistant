@@ -1,6 +1,5 @@
 import Foundation
 import AppIntents
-import UniformTypeIdentifiers
 import PLACore
 import PLAData
 
@@ -142,7 +141,7 @@ struct ScanReceiptIntent: AppIntent {
     static var description = IntentDescription("Mengekstrak nominal, tanggal, dan merchant dari foto struk atau bukti transfer secara offline lalu membuka layar Review Transaksi.")
     static var openAppWhenRun: Bool = true
 
-    @Parameter(title: "Gambar Struk atau Bukti Transfer", supportedTypeIdentifiers: [UTType.image.identifier])
+    @Parameter(title: "Gambar Struk atau Bukti Transfer", supportedTypeIdentifiers: ["public.image"])
     var imageFile: IntentFile
 
     static var parameterSummary: some ParameterSummary {
