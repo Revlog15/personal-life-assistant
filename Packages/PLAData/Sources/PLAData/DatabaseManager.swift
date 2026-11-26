@@ -18,12 +18,12 @@ public enum PLADatabaseError: Error, LocalizedError {
 
 /// Manages GRDB SQLite database lifecycle, Data Protection, forward-only migrations, and pre-migration safety backups (PRD §11.5 & §13.4).
 public final class DatabaseManager: @unchecked Sendable {
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 3
 
     public let dbWriter: any DatabaseWriter
     public let databaseURL: URL?
 
-    public init(inMemory: Bool = false, pathURL: URL? = nil, appVersion: String = "1.0.0") throws {
+    public init(inMemory: Bool = false, pathURL: URL? = nil, appVersion: String = "2.0.0") throws {
         if inMemory {
             let queue = try DatabaseQueue(configuration: Self.makeConfiguration())
             self.dbWriter = queue
@@ -284,10 +284,164 @@ public final class DatabaseManager: @unchecked Sendable {
 
             try db.execute(
                 sql: "INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?), (?, ?)",
+                arguments: ["schemaVersion", "1", "appVersion", appVersion]
+            )
+        }
+
+        // Forward-only migration v2: SavingsGoal table (PRD §11.3 #10, Fase 5 P-03)
+        migrator.registerMigration("v2_savings_goal") { db in
+            try db.create(table: "savings_goals") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("targetAmount", .integer).notNull()
+                t.column("currentAmount", .integer).notNull().defaults(to: 0)
+                t.column("targetDateLocal", .text)
+                t.column("linkedAccountId", .text).references("accounts", onDelete: .setNull)
+                t.column("status", .integer).notNull().defaults(to: 0)
+                t.column("createdAt", .double).notNull()
+                t.column("updatedAt", .double).notNull()
+            }
+            try db.create(index: "idx_savings_goals_status", on: "savings_goals", columns: ["status", "targetDateLocal"])
+            try db.execute(
+                sql: "INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?), (?, ?)",
+                arguments: ["schemaVersion", "2", "appVersion", appVersion]
+            )
+        }
+
+        // Forward-only migration v3: Recurring from completion date (P-10) & Subscription trials (P-11)
+        migrator.registerMigration("v3_post_mvp_recurrence_and_trials") { db in
+            try db.alter(table: "recurrence_rules") { t in
+                t.add(column: "anchorMode", .integer).notNull().defaults(to: 0)
+            }
+            try db.alter(table: "bills") { t in
+                t.add(column: "isTrial", .boolean).notNull().defaults(to: false)
+                t.add(column: "trialEndDateLocal", .text)
+            }
+            try db.execute(
+                sql: "INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?), (?, ?)",
                 arguments: ["schemaVersion", "\(currentSchemaVersion)", "appVersion", appVersion]
             )
         }
 
         return migrator
+    }
+
+    /// Test-only helper exposing the frozen `v1_initial_mvp` migrator to construct authentic v1 disk fixtures.
+    internal static func migratorV1OnlyForTesting() -> DatabaseMigrator {
+        var v1 = DatabaseMigrator()
+        v1.registerMigration("v1_initial_mvp") { db in
+            try db.create(table: "app_metadata") { t in
+                t.column("key", .text).primaryKey()
+                t.column("value", .text).notNull()
+            }
+            try db.create(table: "categories") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("scope", .integer).notNull()
+                t.column("iconName", .text).notNull()
+                t.column("colorToken", .text).notNull()
+                t.column("isSystem", .boolean).notNull().defaults(to: false)
+                t.column("isArchived", .boolean).notNull().defaults(to: false)
+                t.column("sortOrder", .integer).notNull().defaults(to: 0)
+            }
+            try db.create(table: "recurrence_rules") { t in
+                t.column("id", .text).primaryKey()
+                t.column("frequency", .integer).notNull()
+                t.column("interval", .integer).notNull().defaults(to: 1)
+                t.column("weekdaysMask", .integer)
+                t.column("anchorDayOfMonth", .integer)
+                t.column("anchorMonth", .integer)
+                t.column("endDateLocal", .text)
+                t.column("maxOccurrences", .integer)
+            }
+            try db.create(table: "accounts") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("type", .integer).notNull()
+                t.column("initialBalance", .integer).notNull().defaults(to: 0)
+                t.column("iconName", .text).notNull()
+                t.column("colorToken", .text).notNull()
+                t.column("isDefault", .boolean).notNull().defaults(to: false)
+                t.column("isArchived", .boolean).notNull().defaults(to: false)
+                t.column("sortOrder", .integer).notNull().defaults(to: 0)
+                t.column("createdAt", .double).notNull()
+            }
+            try db.create(table: "tasks") { t in
+                t.column("id", .text).primaryKey()
+                t.column("title", .text).notNull()
+                t.column("notes", .text)
+                t.column("dueDateLocal", .text)
+                t.column("dueTimeMinutes", .integer)
+                t.column("priority", .integer).notNull().defaults(to: 1)
+                t.column("status", .integer).notNull().defaults(to: 0)
+                t.column("categoryId", .text).references("categories", onDelete: .setNull)
+                t.column("recurrenceRuleId", .text).references("recurrence_rules", onDelete: .setNull)
+                t.column("completedAt", .double)
+                t.column("createdAt", .double).notNull()
+                t.column("updatedAt", .double).notNull()
+            }
+            try db.create(table: "bills") { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("amount", .integer).notNull()
+                t.column("isVariableAmount", .boolean).notNull().defaults(to: false)
+                t.column("nextDueDateLocal", .text).notNull()
+                t.column("recurrenceRuleId", .text).notNull().references("recurrence_rules", onDelete: .restrict)
+                t.column("defaultAccountId", .text).notNull().references("accounts", onDelete: .restrict)
+                t.column("categoryId", .text).notNull().references("categories", onDelete: .restrict)
+                t.column("isActive", .boolean).notNull().defaults(to: true)
+                t.column("lastPaidDateLocal", .text)
+                t.column("createdAt", .double).notNull()
+                t.column("updatedAt", .double).notNull()
+            }
+            try db.create(table: "reminders") { t in
+                t.column("id", .text).primaryKey()
+                t.column("ownerType", .integer).notNull()
+                t.column("ownerId", .text).notNull()
+                t.column("triggerType", .integer).notNull().defaults(to: 0)
+                t.column("offsetMinutes", .integer)
+                t.column("fireDateLocal", .text).notNull()
+                t.column("soundName", .text).notNull()
+                t.column("isEnabled", .boolean).notNull().defaults(to: true)
+                t.column("lastScheduledAt", .double)
+            }
+            try db.create(table: "transactions") { t in
+                t.column("id", .text).primaryKey()
+                t.column("type", .integer).notNull()
+                t.column("amount", .integer).notNull()
+                t.column("accountId", .text).notNull().references("accounts", onDelete: .restrict)
+                t.column("destinationAccountId", .text).references("accounts", onDelete: .restrict)
+                t.column("categoryId", .text).references("categories", onDelete: .restrict)
+                t.column("billId", .text).references("bills", onDelete: .setNull)
+                t.column("dateLocal", .text).notNull()
+                t.column("note", .text)
+                t.column("createdAt", .double).notNull()
+                t.column("updatedAt", .double).notNull()
+            }
+            try db.create(table: "budgets") { t in
+                t.column("id", .text).primaryKey()
+                t.column("categoryId", .text).references("categories", onDelete: .setNull)
+                t.column("amount", .integer).notNull()
+                t.column("effectiveFromMonth", .text).notNull()
+                t.column("isActive", .boolean).notNull().defaults(to: true)
+                t.column("createdAt", .double).notNull()
+                t.column("updatedAt", .double).notNull()
+            }
+            try db.create(table: "insights") { t in
+                t.column("id", .text).primaryKey()
+                t.column("ruleCode", .text).notNull()
+                t.column("periodKey", .text).notNull()
+                t.column("subjectId", .text)
+                t.column("severity", .integer).notNull()
+                t.column("dismissedAt", .double)
+                t.column("feedback", .integer)
+                t.column("generatedAt", .double).notNull()
+            }
+            try db.execute(
+                sql: "INSERT OR REPLACE INTO app_metadata (key, value) VALUES (?, ?), (?, ?)",
+                arguments: ["schemaVersion", "1", "appVersion", "1.0.0"]
+            )
+        }
+        return v1
     }
 }

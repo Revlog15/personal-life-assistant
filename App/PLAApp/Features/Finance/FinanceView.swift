@@ -7,6 +7,7 @@ enum FinanceSegment: Int, CaseIterable, Identifiable {
     case bills = 2
     case accounts = 3
     case budgets = 4
+    case savings = 5
 
     var id: Int { rawValue }
     var title: String {
@@ -16,6 +17,7 @@ enum FinanceSegment: Int, CaseIterable, Identifiable {
         case .bills: return "Tagihan"
         case .accounts: return "Akun"
         case .budgets: return "Anggaran"
+        case .savings: return "Tabungan"
         }
     }
 }
@@ -47,6 +49,11 @@ struct FinanceView: View {
     @State private var showTotalBudgetSheet = false
     @State private var categoryForBudget: PLACategory?
     @State private var showArchivedAccounts = false
+    @State private var showWhatIfSheet = false
+    @State private var showOCRScanSheet = false
+    @State private var showAddSavingsGoal = false
+    @State private var editingSavingsGoal: SavingsGoal?
+    @State private var allocateSavingsTarget: SavingsAllocateRequest?
 
     var body: some View {
         NavigationStack {
@@ -81,6 +88,8 @@ struct FinanceView: View {
                     accountsList
                 case .budgets:
                     budgetsList
+                case .savings:
+                    savingsList
                 }
             }
             .navigationTitle("Keuangan")
@@ -106,9 +115,18 @@ struct FinanceView: View {
                         Button { showTransfer = true } label: {
                             Label("Transfer Antar Akun", systemImage: "arrow.left.arrow.right.circle")
                         }
+                        Button { showOCRScanSheet = true } label: {
+                            Label("Scan Struk / Transfer (OCR)", systemImage: "doc.text.viewfinder")
+                        }
                         Divider()
+                        Button { showWhatIfSheet = true } label: {
+                            Label("Simulasi \"Bagaimana Jika\"", systemImage: "slider.horizontal.below.square.filled.and.square")
+                        }
+                        Button { showAddSavingsGoal = true } label: {
+                            Label("Tambah Target Tabungan", systemImage: "target")
+                        }
                         Button { showAddBill = true } label: {
-                            Label("Tambah Tagihan", systemImage: "calendar.badge.exclamationmark")
+                            Label("Tambah Tagihan / Trial", systemImage: "calendar.badge.exclamationmark")
                         }
                         Button { showAddAccount = true } label: {
                             Label("Tambah Akun/Dompet", systemImage: "creditcard")
@@ -154,6 +172,21 @@ struct FinanceView: View {
             .sheet(item: $categoryForBudget) { cat in
                 let existing = store.financialSummary.categorySummaries.first { $0.id == cat.id }?.budgetAmount
                 BudgetFormSheet(category: cat, currentAmount: existing).environment(store)
+            }
+            .sheet(isPresented: $showWhatIfSheet) {
+                WhatIfSimulatorSheet().environment(store)
+            }
+            .sheet(isPresented: $showOCRScanSheet) {
+                ReceiptOCRReviewSheet().environment(store)
+            }
+            .sheet(isPresented: $showAddSavingsGoal) {
+                SavingsGoalFormSheet().environment(store)
+            }
+            .sheet(item: $editingSavingsGoal) { goal in
+                SavingsGoalFormSheet(editingGoal: goal).environment(store)
+            }
+            .sheet(item: $allocateSavingsTarget) { req in
+                SavingsAllocateSheet(goal: req.goal, isWithdraw: req.isWithdraw).environment(store)
             }
             // AC-10.3: Skip bill cycle confirmation
             .confirmationDialog(
@@ -310,6 +343,15 @@ struct FinanceView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 }
+
+                // P-04: What-If Simulator quick entry
+                Button {
+                    showWhatIfSheet = true
+                } label: {
+                    Label("Simulasi Beli (\"Bagaimana Jika\")", systemImage: "wand.and.stars")
+                        .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
+                }
+                .buttonStyle(.bordered)
             }
 
             // Top 3 Expense Categories (AC-11.1 & §10.1 cold start)
@@ -575,11 +617,15 @@ struct FinanceView: View {
                     HStack(spacing: PLATokens.Spacing.xs) {
                         Text(bill.name)
                             .font(.body.weight(.semibold))
-                        if overdue {
+                        if bill.isTrial {
+                            StatusBadge(text: "Masa Trial", icon: "hourglass", color: PLATokens.Colors.warning)
+                        } else if overdue {
                             StatusBadge(text: "Jatuh Tempo Terlewat", icon: "exclamationmark.triangle.fill", color: PLATokens.Colors.danger)
                         }
                     }
-                    Text("Jatuh tempo: \(PLAFormatters.shortDate(bill.nextDueDateLocal))")
+                    Text(bill.isTrial
+                         ? "Trial berakhir: \(PLAFormatters.shortDate(bill.effectiveDueOrTrialEndDate)) (pengingat H-3 & H-1)"
+                         : "Jatuh tempo: \(PLAFormatters.shortDate(bill.nextDueDateLocal))")
                         .font(.caption)
                         .foregroundStyle(overdue ? PLATokens.Colors.danger : .secondary)
                     HStack(spacing: PLATokens.Spacing.sm) {
@@ -863,4 +909,113 @@ struct FinanceView: View {
         }
         .listStyle(.insetGrouped)
     }
+
+    // MARK: - 6. Target Tabungan (P-03)
+
+    private var savingsList: some View {
+        List {
+            if store.activeSavingsGoals.isEmpty {
+                Section {
+                    PLAEmptyStateView(
+                        title: "Belum Ada Target Tabungan",
+                        message: "Buat target tabungan seperti Dana Darurat atau Laptop Baru untuk menghitung setoran bulanan secara otomatis.",
+                        systemImage: "target",
+                        actionTitle: "Tambah Target Tabungan",
+                        action: { showAddSavingsGoal = true }
+                    )
+                    .listRowBackground(Color.clear)
+                }
+            } else {
+                Section("Target Tabungan Aktif") {
+                    ForEach(store.activeSavingsGoals) { goal in
+                        savingsGoalRow(goal)
+                    }
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+    }
+
+    private func savingsGoalRow(_ goal: SavingsGoal) -> some View {
+        let prog = SavingsGoalCalculator.evaluate(goal: goal, today: store.today)
+        return VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+            AdaptiveKeyValueRow {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(goal.name)
+                        .font(.body.weight(.semibold))
+                    if let targetDate = goal.targetDateLocal {
+                        Text("Target: \(PLAFormatters.shortDate(targetDate))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } trailing: {
+                if prog.paceStatus == .achieved {
+                    StatusBadge(text: "Tercapai", icon: "checkmark.seal.fill", color: PLATokens.Colors.safe)
+                } else {
+                    Text("\(Int((prog.percentComplete * 100).rounded()))%")
+                        .font(.subheadline.weight(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(PLATokens.Colors.accent)
+                }
+            }
+
+            ProgressView(value: prog.percentComplete)
+                .tint(prog.paceStatus == .achieved ? PLATokens.Colors.safe : PLATokens.Colors.accent)
+
+            AdaptiveKeyValueRow {
+                Text("Terkumpul: \(PLAFormatters.rupiah(goal.currentAmount))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } trailing: {
+                Text("Target: \(PLAFormatters.rupiah(goal.targetAmount))")
+                    .font(.caption.weight(.medium))
+            }
+
+            if let monthly = prog.requiredMonthlyDeposit, monthly > 0 {
+                Text("Butuh setor \(PLAFormatters.rupiah(monthly))/bulan agar tercapai tepat waktu.")
+                    .font(.caption)
+                    .foregroundStyle(PLATokens.Colors.accent)
+            }
+
+            HStack(spacing: PLATokens.Spacing.sm) {
+                Button {
+                    allocateSavingsTarget = SavingsAllocateRequest(goal: goal, isWithdraw: false)
+                } label: {
+                    Label("Setor", systemImage: "plus.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Tarik") {
+                    allocateSavingsTarget = SavingsAllocateRequest(goal: goal, isWithdraw: true)
+                }
+                .font(.subheadline)
+                .buttonStyle(.bordered)
+                .frame(minHeight: PLATokens.minTouchTarget)
+                .disabled(goal.currentAmount <= 0)
+            }
+        }
+        .padding(.vertical, PLATokens.Spacing.xs)
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) {
+                store.deleteSavingsGoal(id: goal.id)
+            } label: {
+                Label("Hapus", systemImage: "trash")
+            }
+            Button {
+                editingSavingsGoal = goal
+            } label: {
+                Label("Sunting", systemImage: "pencil")
+            }
+            .tint(PLATokens.Colors.info)
+        }
+    }
+}
+
+private struct SavingsAllocateRequest: Identifiable {
+    let id = UUID()
+    let goal: SavingsGoal
+    let isWithdraw: Bool
 }

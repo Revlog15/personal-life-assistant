@@ -50,6 +50,37 @@ struct SettingsView: View {
                         Label("Panduan Agar Tidak Terblokir Focus / DND", systemImage: "moon.fill")
                     }
 
+                    NavigationLink {
+                        SiriAndShortcutsGuideView()
+                    } label: {
+                        Label("Siri Shortcuts & OCR Share Sheet", systemImage: "mic.badge.plus")
+                    }
+
+                    Toggle("Pertimbangkan Apple Calendar saat Reschedule", isOn: Binding(
+                        get: { store.settings.useCalendarForReschedule },
+                        set: { enabled in
+                            if enabled {
+                                _Concurrency.Task {
+                                    let ok = await store.calendarService.requestReadAccess()
+                                    store.updateSettings { $0.useCalendarForReschedule = ok }
+                                }
+                            } else {
+                                store.updateSettings { $0.useCalendarForReschedule = false }
+                            }
+                        }
+                    ))
+
+                    if store.settings.preferredReminderMinutes != nil || !store.settings.extraEarlyReminderDaysByCategory.isEmpty {
+                        Button("Reset Penyesuaian Personal Intelligence") {
+                            store.updateSettings {
+                                $0.preferredReminderMinutes = nil
+                                $0.extraEarlyReminderDaysByCategory = [:]
+                            }
+                            store.showToast("Pola pengingat kembali ke default")
+                        }
+                        .foregroundStyle(PLATokens.Colors.warning)
+                    }
+
                     if store.notificationAuthStatus == .denied {
                         Button {
                             store.notificationAdapter.openSystemSettings()
@@ -312,6 +343,7 @@ struct SettingsView: View {
                     AdaptiveKeyValueRow { Text("Jumlah Tugas") } trailing: { Text("\(preview.taskCount)") }
                     AdaptiveKeyValueRow { Text("Jumlah Transaksi") } trailing: { Text("\(preview.transactionCount)") }
                     AdaptiveKeyValueRow { Text("Jumlah Tagihan") } trailing: { Text("\(preview.billCount)") }
+                    AdaptiveKeyValueRow { Text("Jumlah Target Tabungan") } trailing: { Text("\(preview.savingsGoalCount)") }
                     AdaptiveKeyValueRow { Text("Jumlah Akun") } trailing: { Text("\(preview.accountCount)") }
                     AdaptiveKeyValueRow { Text("Total Kekayaan Cair") } trailing: { MoneyText(amount: preview.totalLiquidWealth) }
                 }
@@ -467,6 +499,32 @@ struct FocusModeGuideView: View {
             }
         }
         .navigationTitle("Panduan Focus Mode")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+/// P-02 & P-05: Guide for Siri Shortcuts & Share Sheet OCR without needing a Share Extension (0 extra App IDs).
+struct SiriAndShortcutsGuideView: View {
+    var body: some View {
+        Form {
+            Section("Siri & Action Button (App Intents)") {
+                Label("\"Hey Siri, Tambah tugas di Life Assistant\"", systemImage: "checklist")
+                Label("\"Hey Siri, Catat pengeluaran di Life Assistant\"", systemImage: "banknote")
+                Label("\"Hey Siri, Scan struk di Life Assistant\"", systemImage: "doc.text.viewfinder")
+            }
+
+            Section {
+                Label("1. Buka aplikasi Shortcuts di iPhone → ketuk '+' untuk Shortcut baru.", systemImage: "1.circle.fill")
+                Label("2. Ketuk ikon (i) di bawah → aktifkan 'Show in Share Sheet' → pilih tipe 'Images'.", systemImage: "2.circle.fill")
+                Label("3. Tambahkan aksi 'Scan Struk ke Life Assistant' dan hubungkan inputnya ke 'Shortcut Input'.", systemImage: "3.circle.fill")
+                Label("4. Dari bukti transfer BCA/Mandiri/GoPay/OVO/DANA, ketuk Share → pilih Shortcut Anda.", systemImage: "4.circle.fill")
+            } header: {
+                Text("Pasang Shortcut Share Sheet OCR (0 App ID Tambahan)")
+            } footer: {
+                Text("Semua pemrosesan OCR memakai Apple Vision secara offline dan foto tidak pernah disimpan di aplikasi.")
+            }
+        }
+        .navigationTitle("Siri & Shortcuts")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

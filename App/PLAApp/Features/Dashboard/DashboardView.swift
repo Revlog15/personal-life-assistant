@@ -157,11 +157,24 @@ struct DashboardView: View {
                         }
                     }
                 }
+
+                // 7. Personal Intelligence Suggestions (P-09: R-PER-01 & R-PER-02, opt-in)
+                if !store.personalSuggestions.isEmpty {
+                    Section("Saran Kebiasaan Lokal") {
+                        ForEach(store.personalSuggestions) { suggestion in
+                            PersonalSuggestionRow(
+                                suggestion: suggestion,
+                                onAccept: { store.acceptPersonalSuggestion(suggestion) },
+                                onDismiss: { store.dismissPersonalSuggestion(suggestion) }
+                            )
+                        }
+                    }
+                }
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Beranda")
             .toolbar {
-                // AC-01.4: Quick-add `+` Menu with 4 actions in 1 extra tap
+                // AC-01.4 + P-05: Quick-add `+` Menu
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button {
@@ -183,6 +196,12 @@ struct DashboardView: View {
                             onQuickAdd(.transfer)
                         } label: {
                             Label("Transfer", systemImage: "arrow.left.arrow.right.circle")
+                        }
+                        Divider()
+                        Button {
+                            onQuickAdd(.scanReceipt)
+                        } label: {
+                            Label("Scan Struk (OCR)", systemImage: "doc.text.viewfinder")
                         }
                     } label: {
                         Image(systemName: "plus.circle.fill")
@@ -301,7 +320,13 @@ struct DashboardView: View {
                 HStack(spacing: PLATokens.Spacing.xs) {
                     Text(bill.name)
                         .font(.body.weight(.medium))
-                    if overdue {
+                    if bill.isTrial {
+                        StatusBadge(
+                            text: "Trial",
+                            icon: "hourglass",
+                            color: PLATokens.Colors.warning
+                        )
+                    } else if overdue {
                         StatusBadge(
                             text: "Terlewat",
                             icon: "exclamationmark.triangle.fill",
@@ -309,7 +334,9 @@ struct DashboardView: View {
                         )
                     }
                 }
-                Text("Jatuh tempo \(PLAFormatters.shortDate(bill.nextDueDateLocal))")
+                Text(bill.isTrial
+                     ? "Trial berakhir \(PLAFormatters.shortDate(bill.effectiveDueOrTrialEndDate))"
+                     : "Jatuh tempo \(PLAFormatters.shortDate(bill.nextDueDateLocal))")
                     .font(.caption)
                     .foregroundStyle(overdue ? PLATokens.Colors.danger : .secondary)
             }

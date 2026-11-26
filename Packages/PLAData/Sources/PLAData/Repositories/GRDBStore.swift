@@ -3,7 +3,7 @@ import GRDB
 import PLACore
 
 /// Unified GRDB repository implementing all `PLACore` storage contracts.
-public final class GRDBStore: TaskRepository, ReminderRepository, FinanceRepository, InsightRepository, BackupRepository, @unchecked Sendable {
+public final class GRDBStore: TaskRepository, ReminderRepository, FinanceRepository, InsightRepository, SavingsGoalRepository, BackupRepository, @unchecked Sendable {
     public let dbManager: DatabaseManager
 
     public init(dbManager: DatabaseManager) {
@@ -376,6 +376,27 @@ public final class GRDBStore: TaskRepository, ReminderRepository, FinanceReposit
         }
     }
 
+    // MARK: - SavingsGoalRepository (P-03)
+
+    public func fetchAllSavingsGoals() throws -> [SavingsGoal] {
+        try dbWriter.read { db in
+            let rows = try SavingsGoalRecord.fetchAll(db, sql: "SELECT * FROM savings_goals ORDER BY status ASC, targetDateLocal ASC, createdAt DESC")
+            return try rows.map { try $0.toDomain() }
+        }
+    }
+
+    public func saveSavingsGoal(_ goal: SavingsGoal) throws {
+        try dbWriter.write { db in
+            try SavingsGoalRecord(domain: goal).save(db)
+        }
+    }
+
+    public func deleteSavingsGoal(id: UUID) throws {
+        try dbWriter.write { db in
+            try db.execute(sql: "DELETE FROM savings_goals WHERE id = ?", arguments: [id.uuidString])
+        }
+    }
+
     // MARK: - BackupRepository
 
     public func exportFullPayload(settings: UserSettings) throws -> BackupPayload {
@@ -389,6 +410,7 @@ public final class GRDBStore: TaskRepository, ReminderRepository, FinanceReposit
             let budgets = try BudgetRecord.fetchAll(db).map { try $0.toDomain() }
             let bills = try BillRecord.fetchAll(db).map { try $0.toDomain() }
             let insights = try InsightDBRecord.fetchAll(db).map { try $0.toDomain() }
+            let savingsGoals = try SavingsGoalRecord.fetchAll(db).map { try $0.toDomain() }
 
             return BackupPayload(
                 tasks: tasks,
@@ -400,6 +422,7 @@ public final class GRDBStore: TaskRepository, ReminderRepository, FinanceReposit
                 budgets: budgets,
                 bills: bills,
                 insights: insights,
+                savingsGoals: savingsGoals,
                 settings: settings
             )
         }
@@ -413,6 +436,7 @@ public final class GRDBStore: TaskRepository, ReminderRepository, FinanceReposit
             try db.execute(sql: "DELETE FROM transactions")
             try db.execute(sql: "DELETE FROM budgets")
             try db.execute(sql: "DELETE FROM bills")
+            try db.execute(sql: "DELETE FROM savings_goals")
             try db.execute(sql: "DELETE FROM tasks")
             try db.execute(sql: "DELETE FROM insights")
             try db.execute(sql: "DELETE FROM accounts")
@@ -425,6 +449,7 @@ public final class GRDBStore: TaskRepository, ReminderRepository, FinanceReposit
             for item in payload.accounts { try AccountRecord(domain: item).insert(db) }
             for item in payload.tasks { try TaskRecord(domain: item).insert(db) }
             for item in payload.bills { try BillRecord(domain: item).insert(db) }
+            for item in payload.savingsGoals { try SavingsGoalRecord(domain: item).insert(db) }
             for item in payload.reminders { try ReminderRecord(domain: item).insert(db) }
             for item in payload.transactions { try TransactionRecord(domain: item).insert(db) }
             for item in payload.budgets { try BudgetRecord(domain: item).insert(db) }

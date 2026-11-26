@@ -138,6 +138,12 @@ public enum RecurrenceFrequency: Int, Codable, CaseIterable, Sendable {
     case yearly = 3
 }
 
+/// P-10: Controls whether the next recurring cycle is measured from the original schedule or from completion date.
+public enum RecurrenceAnchorMode: Int, Codable, CaseIterable, Sendable {
+    case fixedSchedule = 0
+    case fromCompletionDate = 1
+}
+
 public struct RecurrenceRule: Identifiable, Hashable, Codable, Sendable {
     public let id: UUID
     public var frequency: RecurrenceFrequency
@@ -150,6 +156,7 @@ public struct RecurrenceRule: Identifiable, Hashable, Codable, Sendable {
     public var anchorMonth: Int?
     public var endDateLocal: LocalDate?
     public var maxOccurrences: Int?
+    public var anchorMode: RecurrenceAnchorMode
 
     public init(
         id: UUID = UUID(),
@@ -159,7 +166,8 @@ public struct RecurrenceRule: Identifiable, Hashable, Codable, Sendable {
         anchorDayOfMonth: Int? = nil,
         anchorMonth: Int? = nil,
         endDateLocal: LocalDate? = nil,
-        maxOccurrences: Int? = nil
+        maxOccurrences: Int? = nil,
+        anchorMode: RecurrenceAnchorMode = .fixedSchedule
     ) {
         self.id = id
         self.frequency = frequency
@@ -169,6 +177,24 @@ public struct RecurrenceRule: Identifiable, Hashable, Codable, Sendable {
         self.anchorMonth = anchorMonth
         self.endDateLocal = endDateLocal
         self.maxOccurrences = maxOccurrences
+        self.anchorMode = anchorMode
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, frequency, interval, weekdaysMask, anchorDayOfMonth, anchorMonth, endDateLocal, maxOccurrences, anchorMode
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.frequency = try c.decode(RecurrenceFrequency.self, forKey: .frequency)
+        self.interval = max(1, try c.decode(Int.self, forKey: .interval))
+        self.weekdaysMask = try c.decodeIfPresent(Int.self, forKey: .weekdaysMask)
+        self.anchorDayOfMonth = try c.decodeIfPresent(Int.self, forKey: .anchorDayOfMonth)
+        self.anchorMonth = try c.decodeIfPresent(Int.self, forKey: .anchorMonth)
+        self.endDateLocal = try c.decodeIfPresent(LocalDate.self, forKey: .endDateLocal)
+        self.maxOccurrences = try c.decodeIfPresent(Int.self, forKey: .maxOccurrences)
+        self.anchorMode = try c.decodeIfPresent(RecurrenceAnchorMode.self, forKey: .anchorMode) ?? .fixedSchedule
     }
 }
 
@@ -367,6 +393,9 @@ public struct Bill: Identifiable, Hashable, Codable, Sendable {
     public var categoryId: UUID
     public var isActive: Bool
     public var lastPaidDateLocal: LocalDate?
+    /// P-11: Subscription trial flag and explicit trial end date (alerts H-3 & H-1 before auto-charge).
+    public var isTrial: Bool
+    public var trialEndDateLocal: LocalDate?
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -381,6 +410,8 @@ public struct Bill: Identifiable, Hashable, Codable, Sendable {
         categoryId: UUID,
         isActive: Bool = true,
         lastPaidDateLocal: LocalDate? = nil,
+        isTrial: Bool = false,
+        trialEndDateLocal: LocalDate? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -394,18 +425,92 @@ public struct Bill: Identifiable, Hashable, Codable, Sendable {
         self.categoryId = categoryId
         self.isActive = isActive
         self.lastPaidDateLocal = lastPaidDateLocal
+        self.isTrial = isTrial
+        self.trialEndDateLocal = trialEndDateLocal
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case id, name, amount, isVariableAmount, nextDueDateLocal, recurrenceRuleId,
+             defaultAccountId, categoryId, isActive, lastPaidDateLocal,
+             isTrial, trialEndDateLocal, createdAt, updatedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.amount = try c.decode(Int64.self, forKey: .amount)
+        self.isVariableAmount = try c.decode(Bool.self, forKey: .isVariableAmount)
+        self.nextDueDateLocal = try c.decode(LocalDate.self, forKey: .nextDueDateLocal)
+        self.recurrenceRuleId = try c.decode(UUID.self, forKey: .recurrenceRuleId)
+        self.defaultAccountId = try c.decode(UUID.self, forKey: .defaultAccountId)
+        self.categoryId = try c.decode(UUID.self, forKey: .categoryId)
+        self.isActive = try c.decode(Bool.self, forKey: .isActive)
+        self.lastPaidDateLocal = try c.decodeIfPresent(LocalDate.self, forKey: .lastPaidDateLocal)
+        self.isTrial = try c.decodeIfPresent(Bool.self, forKey: .isTrial) ?? false
+        self.trialEndDateLocal = try c.decodeIfPresent(LocalDate.self, forKey: .trialEndDateLocal)
+        self.createdAt = try c.decode(Date.self, forKey: .createdAt)
+        self.updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+    }
+
+    public var effectiveDueOrTrialEndDate: LocalDate {
+        if isTrial, let trialEnd = trialEndDateLocal {
+            return trialEnd
+        }
+        return nextDueDateLocal
+    }
+
     public func isOverdue(on today: LocalDate) -> Bool {
-        isActive && nextDueDateLocal < today
+        isActive && effectiveDueOrTrialEndDate < today
     }
 
     public func isDueWithin(days: Int, from today: LocalDate) -> Bool {
         guard isActive else { return false }
-        let diff = today.days(until: nextDueDateLocal)
+        let diff = today.days(until: effectiveDueOrTrialEndDate)
         return diff <= days
+    }
+}
+
+/// P-03: Savings Goal entity (PRD §11.3 #10, Migrasi v2_savings_goal).
+public enum SavingsGoalStatus: Int, Codable, CaseIterable, Sendable {
+    case active = 0
+    case achieved = 1
+    case archived = 2
+}
+
+public struct SavingsGoal: Identifiable, Hashable, Codable, Sendable {
+    public let id: UUID
+    public var name: String
+    public var targetAmount: Int64
+    public var currentAmount: Int64
+    public var targetDateLocal: LocalDate?
+    public var linkedAccountId: UUID?
+    public var status: SavingsGoalStatus
+    public var createdAt: Date
+    public var updatedAt: Date
+
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        targetAmount: Int64,
+        currentAmount: Int64 = 0,
+        targetDateLocal: LocalDate? = nil,
+        linkedAccountId: UUID? = nil,
+        status: SavingsGoalStatus = .active,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.name = name
+        self.targetAmount = max(1, targetAmount)
+        self.currentAmount = max(0, currentAmount)
+        self.targetDateLocal = targetDateLocal
+        self.linkedAccountId = linkedAccountId
+        self.status = status
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
 
@@ -536,6 +641,12 @@ public struct UserSettings: Hashable, Codable, Sendable {
     public var billSound: String
     public var digestSound: String
     public var hasCompletedOnboarding: Bool
+    /// P-09 R-PER-01: Optional user-accepted default reminder hour in minutes (nil = standard 09:00 / 08:00).
+    public var preferredReminderMinutes: Int?
+    /// P-09 R-PER-02: Category UUID strings whose automatic reminders shift extra days earlier (e.g. 1 day).
+    public var extraEarlyReminderDaysByCategory: [String: Int]
+    /// P-08: Whether Smart Rescheduling includes read-only Apple Calendar event counts.
+    public var useCalendarForReschedule: Bool
 
     public static let `default` = UserSettings()
 
@@ -554,7 +665,10 @@ public struct UserSettings: Hashable, Codable, Sendable {
         urgentTaskSound: String = ReminderSound.plaUrgent.rawValue,
         billSound: String = ReminderSound.plaBill.rawValue,
         digestSound: String = ReminderSound.plaDigest.rawValue,
-        hasCompletedOnboarding: Bool = false
+        hasCompletedOnboarding: Bool = false,
+        preferredReminderMinutes: Int? = nil,
+        extraEarlyReminderDaysByCategory: [String: Int] = [:],
+        useCalendarForReschedule: Bool = false
     ) {
         self.quietHoursEnabled = quietHoursEnabled
         self.quietStartMinutes = min(max(quietStartMinutes, 0), 1439)
@@ -571,5 +685,37 @@ public struct UserSettings: Hashable, Codable, Sendable {
         self.billSound = billSound
         self.digestSound = digestSound
         self.hasCompletedOnboarding = hasCompletedOnboarding
+        self.preferredReminderMinutes = preferredReminderMinutes.map { min(max($0, 0), 1439) }
+        self.extraEarlyReminderDaysByCategory = extraEarlyReminderDaysByCategory
+        self.useCalendarForReschedule = useCalendarForReschedule
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case quietHoursEnabled, quietStartMinutes, quietEndMinutes, morningDigestEnabled, morningDigestMinutes,
+             budgetCycleStartDay, financeLockEnabled, showBudgetStatusWhenLocked, autoLockTimeout,
+             reminderPreferences, defaultTaskSound, urgentTaskSound, billSound, digestSound, hasCompletedOnboarding,
+             preferredReminderMinutes, extraEarlyReminderDaysByCategory, useCalendarForReschedule
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.quietHoursEnabled = try c.decodeIfPresent(Bool.self, forKey: .quietHoursEnabled) ?? true
+        self.quietStartMinutes = min(max(try c.decodeIfPresent(Int.self, forKey: .quietStartMinutes) ?? 22 * 60, 0), 1439)
+        self.quietEndMinutes = min(max(try c.decodeIfPresent(Int.self, forKey: .quietEndMinutes) ?? 7 * 60, 0), 1439)
+        self.morningDigestEnabled = try c.decodeIfPresent(Bool.self, forKey: .morningDigestEnabled) ?? true
+        self.morningDigestMinutes = min(max(try c.decodeIfPresent(Int.self, forKey: .morningDigestMinutes) ?? 7 * 60 + 30, 0), 1439)
+        self.budgetCycleStartDay = min(max(try c.decodeIfPresent(Int.self, forKey: .budgetCycleStartDay) ?? 1, 1), 28)
+        self.financeLockEnabled = try c.decodeIfPresent(Bool.self, forKey: .financeLockEnabled) ?? true
+        self.showBudgetStatusWhenLocked = try c.decodeIfPresent(Bool.self, forKey: .showBudgetStatusWhenLocked) ?? true
+        self.autoLockTimeout = try c.decodeIfPresent(AutoLockTimeout.self, forKey: .autoLockTimeout) ?? .immediate
+        self.reminderPreferences = try c.decodeIfPresent(SmartReminderPreferences.self, forKey: .reminderPreferences) ?? .default
+        self.defaultTaskSound = try c.decodeIfPresent(String.self, forKey: .defaultTaskSound) ?? ReminderSound.plaDefault.rawValue
+        self.urgentTaskSound = try c.decodeIfPresent(String.self, forKey: .urgentTaskSound) ?? ReminderSound.plaUrgent.rawValue
+        self.billSound = try c.decodeIfPresent(String.self, forKey: .billSound) ?? ReminderSound.plaBill.rawValue
+        self.digestSound = try c.decodeIfPresent(String.self, forKey: .digestSound) ?? ReminderSound.plaDigest.rawValue
+        self.hasCompletedOnboarding = try c.decodeIfPresent(Bool.self, forKey: .hasCompletedOnboarding) ?? false
+        self.preferredReminderMinutes = try c.decodeIfPresent(Int.self, forKey: .preferredReminderMinutes).map { min(max($0, 0), 1439) }
+        self.extraEarlyReminderDaysByCategory = try c.decodeIfPresent([String: Int].self, forKey: .extraEarlyReminderDaysByCategory) ?? [:]
+        self.useCalendarForReschedule = try c.decodeIfPresent(Bool.self, forKey: .useCalendarForReschedule) ?? false
     }
 }

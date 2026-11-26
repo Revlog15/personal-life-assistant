@@ -10,6 +10,7 @@ public struct BackupPayload: Equatable, Codable, Sendable {
     public var budgets: [Budget]
     public var bills: [Bill]
     public var insights: [InsightRecord]
+    public var savingsGoals: [SavingsGoal]
     public var settings: UserSettings
 
     public init(
@@ -22,6 +23,7 @@ public struct BackupPayload: Equatable, Codable, Sendable {
         budgets: [Budget] = [],
         bills: [Bill] = [],
         insights: [InsightRecord] = [],
+        savingsGoals: [SavingsGoal] = [],
         settings: UserSettings = .default
     ) {
         self.tasks = tasks
@@ -33,7 +35,28 @@ public struct BackupPayload: Equatable, Codable, Sendable {
         self.budgets = budgets
         self.bills = bills
         self.insights = insights
+        self.savingsGoals = savingsGoals
         self.settings = settings
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case tasks, reminders, recurrenceRules, accounts, categories, transactions,
+             budgets, bills, insights, savingsGoals, settings
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.tasks = try c.decodeIfPresent([PLATask].self, forKey: .tasks) ?? []
+        self.reminders = try c.decodeIfPresent([Reminder].self, forKey: .reminders) ?? []
+        self.recurrenceRules = try c.decodeIfPresent([RecurrenceRule].self, forKey: .recurrenceRules) ?? []
+        self.accounts = try c.decodeIfPresent([Account].self, forKey: .accounts) ?? []
+        self.categories = try c.decodeIfPresent([PLACategory].self, forKey: .categories) ?? []
+        self.transactions = try c.decodeIfPresent([PLATransaction].self, forKey: .transactions) ?? []
+        self.budgets = try c.decodeIfPresent([Budget].self, forKey: .budgets) ?? []
+        self.bills = try c.decodeIfPresent([Bill].self, forKey: .bills) ?? []
+        self.insights = try c.decodeIfPresent([InsightRecord].self, forKey: .insights) ?? []
+        self.savingsGoals = try c.decodeIfPresent([SavingsGoal].self, forKey: .savingsGoals) ?? []
+        self.settings = try c.decodeIfPresent(UserSettings.self, forKey: .settings) ?? .default
     }
 }
 
@@ -64,6 +87,7 @@ public struct BackupPreview: Equatable, Sendable {
     public let billCount: Int
     public let accountCount: Int
     public let budgetCount: Int
+    public let savingsGoalCount: Int
     public let totalLiquidWealth: Int64
     public let payload: BackupPayload
 }
@@ -88,9 +112,9 @@ public enum BackupCodecError: Error, Equatable, Sendable {
     }
 }
 
-/// JSON backup encoder/decoder with SHA-256 integrity verification and schema versioning (PRD F-13 / AC-13.1..13.4).
+/// JSON backup encoder/decoder with SHA-256 integrity verification and v1->v2 backwards-compatible migration (PRD F-13 & §11.5).
 public enum BackupCodec {
-    public static let currentSchemaVersion = 1
+    public static let currentSchemaVersion = 2
 
     public static func encode(payload: BackupPayload, exportedAt: Date) throws -> Data {
         let canonicalPayload = try canonicalEncoder().encode(payload)
@@ -120,11 +144,18 @@ public enum BackupCodec {
             ))
         }
 
-        guard let canonicalPayload = try? canonicalEncoder().encode(envelope.payload) else {
-            return .failure(.invalidJSON)
+        let checksumValid: Bool
+        if envelope.exportSchemaVersion == 1 {
+            // Backwards-compatible v1 checksum verification over exact v1 payload JSON projection
+            checksumValid = verifyLegacyV1Checksum(rawData: data, expectedHex: envelope.sha256)
+        } else {
+            guard let canonicalPayload = try? canonicalEncoder().encode(envelope.payload) else {
+                return .failure(.invalidJSON)
+            }
+            checksumValid = SHA256.hexDigest(canonicalPayload).lowercased() == envelope.sha256.lowercased()
         }
-        let expectedChecksum = SHA256.hexDigest(canonicalPayload)
-        guard expectedChecksum.lowercased() == envelope.sha256.lowercased() else {
+
+        guard checksumValid else {
             return .failure(.checksumMismatch)
         }
 
@@ -141,6 +172,7 @@ public enum BackupCodec {
             billCount: envelope.payload.bills.count,
             accountCount: envelope.payload.accounts.count,
             budgetCount: envelope.payload.budgets.count,
+            savingsGoalCount: envelope.payload.savingsGoals.count,
             totalLiquidWealth: wealth,
             payload: envelope.payload
         )
@@ -152,6 +184,20 @@ public enum BackupCodec {
         let h = dateTime.hour < 10 ? "0\(dateTime.hour)" : "\(dateTime.hour)"
         let m = dateTime.minute < 10 ? "0\(dateTime.minute)" : "\(dateTime.minute)"
         return "pla-backup-\(dateDigits)-\(h)\(m).json"
+    }
+
+    /// Re-serializes the raw `"payload"` JSON dictionary from a v1 export in sorted-key canonical form to verify its SHA-256.
+    private static func verifyLegacyV1Checksum(rawData: Data, expectedHex: String) -> Bool {
+        guard let root = try? JSONSerialization.jsonObject(with: rawData) as? [String: Any],
+              let rawPayload = root["payload"],
+              JSONSerialization.isValidJSONObject(rawPayload),
+              let canonical = try? JSONSerialization.data(
+                withJSONObject: rawPayload,
+                options: [.sortedKeys]
+              ) else {
+            return false
+        }
+        return SHA256.hexDigest(canonical).lowercased() == expectedHex.lowercased()
     }
 
     private static func canonicalEncoder() -> JSONEncoder {

@@ -43,12 +43,14 @@ targets:
         BGTaskSchedulerPermittedIdentifiers:
           - id.pla.refresh-notifications
         NSFaceIDUsageDescription: Personal Life Assistant menggunakan Face ID untuk melindungi halaman Keuangan agar saldo dan transaksi Anda tetap pribadi.
+        NSCalendarsUsageDescription: Personal Life Assistant membaca jadwal kalender Anda (hanya-baca) untuk menyarankan hari paling longgar saat menjadwalkan ulang tugas.
+        NSCalendarsFullAccessUsageDescription: Personal Life Assistant membaca jadwal kalender Anda (hanya-baca) untuk menyarankan hari paling longgar saat menjadwalkan ulang tugas.
         ITSAppUsesNonExemptEncryption: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: id.revand.pla
         PRODUCT_NAME: PLAApp
-        MARKETING_VERSION: "1.0.0"
+        MARKETING_VERSION: "2.0.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"

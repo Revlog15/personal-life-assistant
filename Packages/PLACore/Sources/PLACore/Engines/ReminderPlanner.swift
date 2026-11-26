@@ -14,6 +14,13 @@ public enum ReminderPlanner {
 
         let prefs = settings.reminderPreferences
         let sound = task.priority == .high ? settings.urgentTaskSound : settings.defaultTaskSound
+        let defaultHourMinutes = settings.preferredReminderMinutes ?? (9 * 60)
+        let dayOfHourMinutes = settings.preferredReminderMinutes ?? (8 * 60)
+        let extraEarlyDays: Int = {
+            guard let catId = task.categoryId else { return 0 }
+            return max(0, settings.extraEarlyReminderDaysByCategory[catId.uuidString] ?? 0)
+        }()
+
         let deadlineDateTime = LocalDateTime(
             date: dueDate,
             minutesFromMidnight: task.dueTimeMinutes ?? (23 * 60 + 59)
@@ -30,29 +37,32 @@ public enum ReminderPlanner {
         switch task.priority {
         case .high:
             if prefs.highEnableH7 {
+                let days = 7 + extraEarlyDays
                 rawSlots.append(RawSlot(
-                    fire: LocalDateTime(date: dueDate.addingDays(-7), hour: 9, minute: 0),
-                    offsetMinutes: -7 * 1440,
+                    fire: LocalDateTime(date: dueDate.addingDays(-days), minutesFromMidnight: defaultHourMinutes),
+                    offsetMinutes: -days * 1440,
                     isDeadlineProximity: false
                 ))
             }
             if prefs.highEnableH3 {
+                let days = 3 + extraEarlyDays
                 rawSlots.append(RawSlot(
-                    fire: LocalDateTime(date: dueDate.addingDays(-3), hour: 9, minute: 0),
-                    offsetMinutes: -3 * 1440,
+                    fire: LocalDateTime(date: dueDate.addingDays(-days), minutesFromMidnight: defaultHourMinutes),
+                    offsetMinutes: -days * 1440,
                     isDeadlineProximity: false
                 ))
             }
             if prefs.highEnableH1 {
+                let days = 1 + extraEarlyDays
                 rawSlots.append(RawSlot(
-                    fire: LocalDateTime(date: dueDate.addingDays(-1), hour: 9, minute: 0),
-                    offsetMinutes: -1440,
+                    fire: LocalDateTime(date: dueDate.addingDays(-days), minutesFromMidnight: defaultHourMinutes),
+                    offsetMinutes: -days * 1440,
                     isDeadlineProximity: false
                 ))
             }
             if prefs.highEnableDayOf {
                 rawSlots.append(RawSlot(
-                    fire: LocalDateTime(date: dueDate, hour: 8, minute: 0),
+                    fire: LocalDateTime(date: dueDate, minutesFromMidnight: dayOfHourMinutes),
                     offsetMinutes: 0,
                     isDeadlineProximity: false
                 ))
@@ -68,31 +78,40 @@ public enum ReminderPlanner {
 
         case .medium:
             if prefs.mediumEnableH3 {
+                let days = 3 + extraEarlyDays
                 rawSlots.append(RawSlot(
-                    fire: LocalDateTime(date: dueDate.addingDays(-3), hour: 9, minute: 0),
-                    offsetMinutes: -3 * 1440,
+                    fire: LocalDateTime(date: dueDate.addingDays(-days), minutesFromMidnight: defaultHourMinutes),
+                    offsetMinutes: -days * 1440,
                     isDeadlineProximity: false
                 ))
             }
             if prefs.mediumEnableH1 {
+                let days = 1 + extraEarlyDays
                 rawSlots.append(RawSlot(
-                    fire: LocalDateTime(date: dueDate.addingDays(-1), hour: 9, minute: 0),
-                    offsetMinutes: -1440,
+                    fire: LocalDateTime(date: dueDate.addingDays(-days), minutesFromMidnight: defaultHourMinutes),
+                    offsetMinutes: -days * 1440,
                     isDeadlineProximity: false
                 ))
             }
             if prefs.mediumEnableDayOf {
                 rawSlots.append(RawSlot(
-                    fire: LocalDateTime(date: dueDate, hour: 8, minute: 0),
+                    fire: LocalDateTime(date: dueDate, minutesFromMidnight: dayOfHourMinutes),
                     offsetMinutes: 0,
                     isDeadlineProximity: false
                 ))
             }
 
         case .low:
+            if extraEarlyDays > 0 {
+                rawSlots.append(RawSlot(
+                    fire: LocalDateTime(date: dueDate.addingDays(-extraEarlyDays), minutesFromMidnight: defaultHourMinutes),
+                    offsetMinutes: -extraEarlyDays * 1440,
+                    isDeadlineProximity: false
+                ))
+            }
             if prefs.lowEnableDayOf {
                 rawSlots.append(RawSlot(
-                    fire: LocalDateTime(date: dueDate, hour: 9, minute: 0),
+                    fire: LocalDateTime(date: dueDate, minutesFromMidnight: defaultHourMinutes),
                     offsetMinutes: 0,
                     isDeadlineProximity: false
                 ))
@@ -153,7 +172,8 @@ public enum ReminderPlanner {
         return results
     }
 
-    /// Generates automatic reminders for an active recurring Bill (H-3 09:00, H-1 09:00, Hari H 08:00).
+    /// Generates automatic reminders for an active recurring Bill (H-3 09:00, H-1 09:00, Hari H 08:00),
+    /// or P-11 trial-end reminders (H-3 & H-1 before auto-charge).
     public static func planBillReminders(
         for bill: Bill,
         now: LocalDateTime,
@@ -161,20 +181,27 @@ public enum ReminderPlanner {
     ) -> [Reminder] {
         guard bill.isActive else { return [] }
         let prefs = settings.reminderPreferences
-        let due = bill.nextDueDateLocal
+        let due = bill.effectiveDueOrTrialEndDate
         let deadline = LocalDateTime(date: due, hour: 23, minute: 59)
 
         var raw: [(LocalDateTime, Int)] = []
-        if prefs.billEnableH3 {
+        if bill.isTrial {
+            // P-11: Always remind H-3 and H-1 before trial ends so user can cancel before auto-charge
             raw.append((LocalDateTime(date: due.addingDays(-3), hour: 9, minute: 0), -3 * 1440))
-        }
-        if prefs.billEnableH1 {
             raw.append((LocalDateTime(date: due.addingDays(-1), hour: 9, minute: 0), -1440))
-        }
-        if prefs.billEnableDayOf {
-            raw.append((LocalDateTime(date: due, hour: 8, minute: 0), 0))
+        } else {
+            if prefs.billEnableH3 {
+                raw.append((LocalDateTime(date: due.addingDays(-3), hour: 9, minute: 0), -3 * 1440))
+            }
+            if prefs.billEnableH1 {
+                raw.append((LocalDateTime(date: due.addingDays(-1), hour: 9, minute: 0), -1440))
+            }
+            if prefs.billEnableDayOf {
+                raw.append((LocalDateTime(date: due, hour: 8, minute: 0), 0))
+            }
         }
 
+        let sound = bill.isTrial ? settings.urgentTaskSound : settings.billSound
         var results: [Reminder] = []
         var seenDates = Set<LocalDate>()
         for (fire, offset) in raw {
@@ -189,7 +216,7 @@ public enum ReminderPlanner {
                 triggerType: .automatic,
                 offsetMinutes: offset,
                 fireDateLocal: shifted,
-                soundName: settings.billSound,
+                soundName: sound,
                 isEnabled: true
             ))
         }

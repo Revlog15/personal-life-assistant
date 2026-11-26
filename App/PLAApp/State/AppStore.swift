@@ -12,6 +12,7 @@ final class AppStore {
     let settingsStore: SettingsStore
     let diagnostics: DiagnosticsService
     let authService: AuthService
+    let calendarService: CalendarService
     let notificationAdapter: NotificationAdapter
     let backgroundRefresh: BackgroundRefreshService
     let clock: any PLAClock
@@ -26,6 +27,7 @@ final class AppStore {
     var budgets: [Budget] = []
     var bills: [Bill] = []
     var insightRecords: [InsightRecord] = []
+    var savingsGoals: [SavingsGoal] = []
     var settings: UserSettings
 
     // System & UI state
@@ -33,6 +35,8 @@ final class AppStore {
     var pendingNotificationCount: Int = 0
     var sideloadInfo: SideloadExpiryInfo
     var databaseErrorMessage: String?
+    var pendingOCRReceipt: PendingOCRReceiptDraft?
+    var dismissedPersonalSuggestionIds: Set<String> = []
 
     // Toast & 5-second Undo state (AC-02.3)
     var toastMessage: String?
@@ -47,7 +51,10 @@ final class AppStore {
         self.settingsStore = SettingsStore()
         self.diagnostics = DiagnosticsService()
         self.authService = AuthService()
+        self.calendarService = CalendarService()
         self.notificationAdapter = NotificationAdapter(diagnostics: diagnostics)
+        // PRD §13.4: Sweep any residual temporary OCR files on every launch
+        VisionReceiptOCRService.cleanupResidualTempFiles()
         self.backgroundRefresh = BackgroundRefreshService(
             diagnostics: diagnostics,
             notificationAdapter: notificationAdapter,
@@ -81,6 +88,7 @@ final class AppStore {
         }
 
         reloadAllData()
+        consumePendingOCRReceiptIfAny()
         setupSystemTimeObservers()
     }
 
@@ -113,6 +121,21 @@ final class AppStore {
             categories: categories,
             existingRecords: insightRecords
         )
+    }
+
+    /// P-09: Opt-in Personal Intelligence suggestions (R-PER-01 & R-PER-02), cold-start guarded.
+    var personalSuggestions: [PersonalSuggestion] {
+        PersonalIntelligenceEngine.evaluate(
+            tasks: tasks,
+            categories: categories,
+            now: clock.now,
+            timeZone: clock.timeZone,
+            settings: settings
+        ).filter { !dismissedPersonalSuggestionIds.contains($0.id) }
+    }
+
+    var activeSavingsGoals: [SavingsGoal] {
+        savingsGoals.filter { $0.status != .archived }
     }
 
     var accountBalances: [UUID: Int64] {
@@ -224,12 +247,21 @@ final class AppStore {
             budgets = try store.fetchAllBudgets()
             bills = try store.fetchAllBills()
             insightRecords = try store.fetchAllInsights()
+            savingsGoals = try store.fetchAllSavingsGoals()
         } catch {
             diagnostics.log(level: "ERROR", category: "Reload", message: "Gagal memuat data: \(error.localizedDescription)")
         }
     }
 
+    func consumePendingOCRReceiptIfAny() {
+        if let draft = PendingOCRReceiptStore.consume() {
+            pendingOCRReceipt = draft
+        }
+    }
+
     func refreshSystemStatusAndSyncNotifications() {
+        consumePendingOCRReceiptIfAny()
+        reloadAllData()
         sideloadInfo = SideloadExpiryReader.read(
             manualRefreshDate: settingsStore.loadManualSideloadRefreshDate(),
             timeZone: clock.timeZone
@@ -365,15 +397,17 @@ final class AppStore {
             try store.saveTask(completed)
             try store.deleteReminders(forOwnerId: task.id)
 
-            // AC-04.2: Generate next recurring cycle automatically if task has a RecurrenceRule
+            // AC-04.2 & P-10: Generate next recurring cycle (supports fixedSchedule AND fromCompletionDate!)
             if let ruleId = task.recurrenceRuleId,
                let rule = recurrenceRule(for: ruleId),
                let currentDue = task.dueDateLocal {
                 let nextDue: LocalDate?
-                if catchUpFromToday {
+                if rule.anchorMode == .fromCompletionDate {
+                    nextDue = RecurrenceEngine.nextOccurrence(after: currentDue, completedOn: today, rule: rule)
+                } else if catchUpFromToday {
                     nextDue = RecurrenceEngine.nextOccurrenceFromToday(overdueDate: currentDue, today: today, rule: rule)
                 } else {
-                    nextDue = RecurrenceEngine.nextOccurrence(after: currentDue, rule: rule)
+                    nextDue = RecurrenceEngine.nextOccurrence(after: currentDue, completedOn: today, rule: rule)
                 }
 
                 if let nextDue {
@@ -914,6 +948,93 @@ final class AppStore {
                 self?.refreshSystemStatusAndSyncNotifications()
             }
         }
-        systemObservers = [tzObserver, clockObserver]
+        let externalObserver = NotificationCenter.default.addObserver(
+            forName: .plaExternalDataDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            _Concurrency.Task { @MainActor in
+                self?.reloadAllData()
+                await self?.syncNotificationQueueNow()
+            }
+        }
+        let ocrObserver = NotificationCenter.default.addObserver(
+            forName: .plaPendingOCRReceiptArrived,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            _Concurrency.Task { @MainActor in
+                self?.consumePendingOCRReceiptIfAny()
+            }
+        }
+        systemObservers = [tzObserver, clockObserver, externalObserver, ocrObserver]
+    }
+
+    // MARK: - Pasca-MVP Helpers (P-01, P-03, P-08, P-09)
+
+    func createTaskFromNaturalLanguage(_ phrase: String) {
+        let parsed = NaturalLanguageTaskParser.parse(phrase, today: today, categories: categories)
+        guard PLATask.isValidTitle(parsed.title) else { return }
+        createOrUpdateTask(
+            existing: nil,
+            title: parsed.title,
+            notes: nil,
+            dueDate: parsed.dueDate,
+            dueTimeMinutes: parsed.dueTimeMinutes,
+            priority: parsed.priority,
+            categoryId: parsed.matchedCategoryId ?? defaultTaskCategory?.id,
+            recurrenceRule: nil
+        )
+        showToast("Tugas \"\(parsed.title)\" ditambahkan")
+    }
+
+    func saveSavingsGoal(_ goal: SavingsGoal) {
+        guard let store else { return }
+        do {
+            try store.saveSavingsGoal(goal)
+            reloadAllData()
+            showToast("Target tabungan tersimpan")
+        } catch {
+            diagnostics.log(level: "ERROR", category: "SavingsGoal", message: "Gagal menyimpan target tabungan: \(error.localizedDescription)")
+        }
+    }
+
+    func adjustSavingsGoal(_ goal: SavingsGoal, delta: Int64) {
+        var updated = goal
+        updated.currentAmount = max(Int64(0), goal.currentAmount + delta)
+        updated.status = updated.currentAmount >= updated.targetAmount ? .achieved : .active
+        updated.updatedAt = clock.now
+        saveSavingsGoal(updated)
+    }
+
+    func deleteSavingsGoal(id: UUID) {
+        guard let store else { return }
+        do {
+            try store.deleteSavingsGoal(id: id)
+            reloadAllData()
+        } catch {
+            diagnostics.log(level: "ERROR", category: "SavingsGoal", message: "Gagal menghapus target tabungan: \(error.localizedDescription)")
+        }
+    }
+
+    func acceptPersonalSuggestion(_ suggestion: PersonalSuggestion) {
+        switch suggestion.kind {
+        case .productiveTimeBlock(let block, _, _):
+            updateSettings { $0.preferredReminderMinutes = block.suggestedReminderMinutes }
+            showToast("Jam default pengingat diatur ke \(PLAFormatters.time24(block.suggestedReminderMinutes))")
+        case .categoryLatenessHabit(let catId, let name, _, _):
+            updateSettings { $0.extraEarlyReminderDaysByCategory[catId.uuidString] = 1 }
+            showToast("Pengingat kategori \(name) dimajukan 1 hari lebih awal")
+        }
+        dismissedPersonalSuggestionIds.insert(suggestion.id)
+    }
+
+    func dismissPersonalSuggestion(_ suggestion: PersonalSuggestion) {
+        dismissedPersonalSuggestionIds.insert(suggestion.id)
+    }
+
+    func calendarEventCountsForNext7Days() -> [LocalDate: Int] {
+        guard settings.useCalendarForReschedule else { return [:] }
+        return calendarService.eventCountsForNext7Days(from: today, timeZone: clock.timeZone)
     }
 }

@@ -214,3 +214,74 @@ struct AlertBannerRow: View {
         .padding(.vertical, PLATokens.Spacing.xs)
     }
 }
+
+/// P-09: Personal Intelligence opt-in suggestion card (R-PER-01 & R-PER-02) requiring explicit user confirmation.
+struct PersonalSuggestionRow: View {
+    let suggestion: PersonalSuggestion
+    let onAccept: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+            HStack(alignment: .top, spacing: PLATokens.Spacing.sm) {
+                Image(systemName: iconName)
+                    .font(.title3)
+                    .foregroundStyle(PLATokens.Colors.accent)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
+                    Text(titleText)
+                        .font(.subheadline.weight(.semibold))
+                    Text(bodyText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .accessibilityElement(children: .combine)
+
+            HStack(spacing: PLATokens.Spacing.sm) {
+                Button(acceptLabel, action: onAccept)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .frame(minHeight: PLATokens.minTouchTarget)
+                Button("Nanti Saja", action: onDismiss)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .frame(minHeight: PLATokens.minTouchTarget)
+            }
+        }
+        .padding(.vertical, PLATokens.Spacing.xs)
+    }
+
+    private var iconName: String {
+        switch suggestion.kind {
+        case .productiveTimeBlock: return "clock.arrow.circlepath"
+        case .categoryLatenessHabit: return "bell.badge.waveform.fill"
+        }
+    }
+
+    private var titleText: String {
+        switch suggestion.kind {
+        case .productiveTimeBlock(let block, _, _):
+            return "Jam Produktif: \(block.labelIndonesian)"
+        case .categoryLatenessHabit(_, let name, let pct, _):
+            return "\(pct)% Tugas \(name) Lewat Deadline"
+        }
+    }
+
+    private var bodyText: String {
+        switch suggestion.kind {
+        case .productiveTimeBlock(let block, let pct, let count):
+            return "\(pct)% dari \(count) tugas terakhir Anda selesai di waktu \(block.labelIndonesian). Mau jadikan pukul \(PLAFormatters.time24(block.suggestedReminderMinutes)) sebagai jam default pengingat?"
+        case .categoryLatenessHabit(_, let name, let pct, let count):
+            return "\(pct)% dari \(count) tugas kategori \(name) selesai melewati deadline. Tambah pengingat otomatis 1 hari lebih awal untuk kategori ini?"
+        }
+    }
+
+    private var acceptLabel: String {
+        switch suggestion.kind {
+        case .productiveTimeBlock: return "Terapkan Jam Default"
+        case .categoryLatenessHabit: return "Majukan 1 Hari"
+        }
+    }
+}

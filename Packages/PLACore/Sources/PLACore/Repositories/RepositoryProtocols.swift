@@ -54,6 +54,12 @@ public protocol InsightRepository: Sendable {
     func saveInsight(_ record: InsightRecord) throws
 }
 
+public protocol SavingsGoalRepository: Sendable {
+    func fetchAllSavingsGoals() throws -> [SavingsGoal]
+    func saveSavingsGoal(_ goal: SavingsGoal) throws
+    func deleteSavingsGoal(id: UUID) throws
+}
+
 public protocol BackupRepository: Sendable {
     func exportFullPayload(settings: UserSettings) throws -> BackupPayload
     func restoreAtomically(payload: BackupPayload) throws

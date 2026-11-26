@@ -44,6 +44,22 @@ struct TasksView: View {
                 .padding(.vertical, PLATokens.Spacing.sm)
 
                 List {
+                    // P-01: Inline Natural Language Quick Add bar
+                    Section {
+                        QuickAddNaturalBar()
+                    }
+
+                    // P-09: Personal Intelligence opt-in suggestion card
+                    if let topSuggestion = store.personalSuggestions.first {
+                        Section("Saran Kebiasaan Lokal") {
+                            PersonalSuggestionRow(
+                                suggestion: topSuggestion,
+                                onAccept: { store.acceptPersonalSuggestion(topSuggestion) },
+                                onDismiss: { store.dismissPersonalSuggestion(topSuggestion) }
+                            )
+                        }
+                    }
+
                     // AC-05.4: Non-intrusive notification-denied banner
                     if store.notificationAuthStatus == .denied {
                         Section {

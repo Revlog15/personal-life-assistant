@@ -105,7 +105,7 @@ final class HelpersAndExportTests: XCTestCase {
 
         switch decoded {
         case .success(let preview):
-            XCTAssertEqual(preview.exportSchemaVersion, 1)
+            XCTAssertEqual(preview.exportSchemaVersion, BackupCodec.currentSchemaVersion)
             XCTAssertEqual(preview.taskCount, 1)
             XCTAssertEqual(preview.transactionCount, 1)
             XCTAssertEqual(preview.billCount, 1)
@@ -133,10 +133,10 @@ final class HelpersAndExportTests: XCTestCase {
 
         // Future schema version
         var futureText = String(data: validData, encoding: .utf8)!
-        futureText = futureText.replacingOccurrences(of: "\"exportSchemaVersion\" : 1", with: "\"exportSchemaVersion\" : 99")
+        futureText = futureText.replacingOccurrences(of: "\"exportSchemaVersion\" : 2", with: "\"exportSchemaVersion\" : 99")
         XCTAssertEqual(
             BackupCodec.decodeAndValidate(data: Data(futureText.utf8)),
-            .failure(.unsupportedFutureVersion(found: 99, maxSupported: 1))
+            .failure(.unsupportedFutureVersion(found: 99, maxSupported: BackupCodec.currentSchemaVersion))
         )
     }
 

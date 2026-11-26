@@ -2,13 +2,15 @@ import Foundation
 
 /// Deterministic recurrence calculation handling day 29-31 clamping, end-of-month, and leap years (PRD §12).
 public enum RecurrenceEngine {
-    /// Computes the next occurrence strictly after `currentDate`.
+    /// Computes the next occurrence strictly after `currentDate` (or relative to `completedOn` for P-10 `.fromCompletionDate` rules).
     /// - Parameters:
     ///   - currentDate: The date of the cycle being completed or skipped.
+    ///   - completedOn: Optional actual completion date used when `rule.anchorMode == .fromCompletionDate`.
     ///   - rule: The recurrence rule.
     ///   - completedOccurrences: Count of occurrences already completed INCLUDING `currentDate`.
     public static func nextOccurrence(
         after currentDate: LocalDate,
+        completedOn: LocalDate? = nil,
         rule: RecurrenceRule,
         completedOccurrences: Int = 1
     ) -> LocalDate? {
@@ -16,24 +18,31 @@ public enum RecurrenceEngine {
             return nil
         }
 
+        let baseDate: LocalDate
+        if rule.anchorMode == .fromCompletionDate, let completion = completedOn {
+            baseDate = completion
+        } else {
+            baseDate = currentDate
+        }
+
         let step = max(1, rule.interval)
         let candidate: LocalDate
 
         switch rule.frequency {
         case .daily:
-            candidate = currentDate.addingDays(step)
+            candidate = baseDate.addingDays(step)
 
         case .weekly:
-            candidate = nextWeeklyOccurrence(after: currentDate, interval: step, weekdaysMask: rule.weekdaysMask)
+            candidate = nextWeeklyOccurrence(after: baseDate, interval: step, weekdaysMask: rule.weekdaysMask)
 
         case .monthly:
-            let anchor = rule.anchorDayOfMonth ?? currentDate.day
-            candidate = currentDate.addingMonths(step, anchorDay: anchor)
+            let anchor = rule.anchorMode == .fromCompletionDate ? baseDate.day : (rule.anchorDayOfMonth ?? baseDate.day)
+            candidate = baseDate.addingMonths(step, anchorDay: anchor)
 
         case .yearly:
-            let anchorMonth = rule.anchorMonth ?? currentDate.month
-            let anchorDay = rule.anchorDayOfMonth ?? currentDate.day
-            candidate = currentDate.addingYears(step, anchorMonth: anchorMonth, anchorDay: anchorDay)
+            let anchorMonth = rule.anchorMode == .fromCompletionDate ? baseDate.month : (rule.anchorMonth ?? baseDate.month)
+            let anchorDay = rule.anchorMode == .fromCompletionDate ? baseDate.day : (rule.anchorDayOfMonth ?? baseDate.day)
+            candidate = baseDate.addingYears(step, anchorMonth: anchorMonth, anchorDay: anchorDay)
         }
 
         if let end = rule.endDateLocal, candidate > end {

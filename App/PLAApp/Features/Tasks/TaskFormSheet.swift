@@ -23,6 +23,7 @@ struct TaskFormSheet: View {
     @State private var interval: Int
     @State private var weekdaysMask: Int
     @State private var monthlyUseEndOfMonth: Bool
+    @State private var recurrenceAnchorMode: RecurrenceAnchorMode
 
     @FocusState private var isTitleFocused: Bool
 
@@ -52,6 +53,7 @@ struct TaskFormSheet: View {
         _interval = State(initialValue: 1)
         _weekdaysMask = State(initialValue: 1) // Monday default
         _monthlyUseEndOfMonth = State(initialValue: false)
+        _recurrenceAnchorMode = State(initialValue: .fixedSchedule)
     }
 
     private var isTitleValid: Bool {
@@ -185,6 +187,11 @@ struct TaskFormSheet: View {
                             if frequency == .monthly {
                                 Toggle("Selalu pada Hari Terakhir Bulan", isOn: $monthlyUseEndOfMonth)
                             }
+
+                            Picker("Patokan Siklus Berikutnya", selection: $recurrenceAnchorMode) {
+                                Text("Dari Jadwal Asli").tag(RecurrenceAnchorMode.fixedSchedule)
+                                Text("Dari Tanggal Selesai").tag(RecurrenceAnchorMode.fromCompletionDate)
+                            }
                         }
                     }
                 }
@@ -214,6 +221,7 @@ struct TaskFormSheet: View {
                     interval = rule.interval
                     weekdaysMask = rule.weekdaysMask ?? (resolvedLocalDate?.weekdayBit ?? 1)
                     monthlyUseEndOfMonth = (rule.anchorDayOfMonth == -1)
+                    recurrenceAnchorMode = rule.anchorMode
                 } else if editingTask == nil {
                     isTitleFocused = true
                 }
@@ -273,7 +281,8 @@ struct TaskFormSheet: View {
                 interval: interval,
                 weekdaysMask: frequency == .weekly ? weekdaysMask : nil,
                 anchorDayOfMonth: frequency == .monthly ? (monthlyUseEndOfMonth ? -1 : due.day) : (frequency == .yearly ? due.day : nil),
-                anchorMonth: frequency == .yearly ? due.month : nil
+                anchorMonth: frequency == .yearly ? due.month : nil,
+                anchorMode: recurrenceAnchorMode
             )
         }
 

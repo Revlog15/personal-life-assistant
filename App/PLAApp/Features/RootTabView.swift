@@ -13,6 +13,7 @@ enum QuickAddSheetKind: Identifiable {
     case expense
     case income
     case transfer
+    case scanReceipt
 
     var id: String {
         switch self {
@@ -20,6 +21,7 @@ enum QuickAddSheetKind: Identifiable {
         case .expense: return "expense"
         case .income: return "income"
         case .transfer: return "transfer"
+        case .scanReceipt: return "scanReceipt"
         }
     }
 }
@@ -103,7 +105,17 @@ struct RootTabView: View {
             case .transfer:
                 TransferFormSheet()
                     .environment(store)
+            case .scanReceipt:
+                ReceiptOCRReviewSheet()
+                    .environment(store)
             }
+        }
+        .sheet(item: Binding(
+            get: { store.pendingOCRReceipt },
+            set: { store.pendingOCRReceipt = $0 }
+        )) { draft in
+            ReceiptOCRReviewSheet(initialDraft: draft)
+                .environment(store)
         }
     }
 

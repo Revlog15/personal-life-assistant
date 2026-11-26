@@ -15,6 +15,8 @@ struct BillFormSheet: View {
     @State private var frequency: RecurrenceFrequency
     @State private var selectedAccountId: UUID?
     @State private var selectedCategoryId: UUID?
+    @State private var isTrial: Bool
+    @State private var trialEndDate: Date
 
     init(editingBill: Bill? = nil) {
         self.editingBill = editingBill
@@ -30,6 +32,13 @@ struct BillFormSheet: View {
         _frequency = State(initialValue: .monthly)
         _selectedAccountId = State(initialValue: editingBill?.defaultAccountId)
         _selectedCategoryId = State(initialValue: editingBill?.categoryId)
+        _isTrial = State(initialValue: editingBill?.isTrial ?? false)
+        if let tEnd = editingBill?.trialEndDateLocal {
+            _trialEndDate = State(initialValue: tEnd.toDate(minutesFromMidnight: 9 * 60, timeZone: tz))
+        } else {
+            let plus14 = LocalDate.from(date: Date(), timeZone: tz).addingDays(14)
+            _trialEndDate = State(initialValue: plus14.toDate(minutesFromMidnight: 9 * 60, timeZone: tz))
+        }
     }
 
     private var parsedAmount: Result<Money, AmountParseError> {
@@ -68,10 +77,18 @@ struct BillFormSheet: View {
                         Text("Tahunan").tag(RecurrenceFrequency.yearly)
                     }
                     .pickerStyle(.segmented)
+
+                    // P-11: Subscription trial end warning
+                    Toggle("Ini Masa Trial Langganan", isOn: $isTrial)
+                    if isTrial {
+                        DatePicker("Tanggal Akhir Trial", selection: $trialEndDate, displayedComponents: .date)
+                    }
                 } header: {
                     Text("Jadwal & Siklus")
                 } footer: {
-                    Text("Pengingat otomatis akan dijadwalkan pada H-3, H-1, dan Hari H dengan suara kustom tagihan.")
+                    Text(isTrial
+                         ? "Pengingat tegas H-3 dan H-1 sebelum tanggal akhir trial agar Anda sempat membatalkan sebelum terdebit otomatis."
+                         : "Pengingat otomatis akan dijadwalkan pada H-3, H-1, dan Hari H dengan suara kustom tagihan.")
                 }
 
                 Section("Pencatatan Otomatis Saat Lunas") {
@@ -123,6 +140,7 @@ struct BillFormSheet: View {
               let catId = selectedCategoryId else { return }
 
         let localDue = LocalDate.from(date: dueDate, timeZone: store.clock.timeZone)
+        let localTrialEnd = isTrial ? LocalDate.from(date: trialEndDate, timeZone: store.clock.timeZone) : nil
         let ruleId = editingBill?.recurrenceRuleId ?? UUID()
         let rule = RecurrenceRule(
             id: ruleId,
@@ -136,12 +154,14 @@ struct BillFormSheet: View {
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             amount: money.rupiah,
             isVariableAmount: isVariableAmount,
-            nextDueDateLocal: localDue,
+            nextDueDateLocal: localTrialEnd ?? localDue,
             recurrenceRuleId: rule.id,
             defaultAccountId: accId,
             categoryId: catId,
             isActive: editingBill?.isActive ?? true,
             lastPaidDateLocal: editingBill?.lastPaidDateLocal,
+            isTrial: isTrial,
+            trialEndDateLocal: localTrialEnd,
             createdAt: editingBill?.createdAt ?? store.clock.now,
             updatedAt: store.clock.now
         )

@@ -17,7 +17,16 @@ Dibangun dari Windows tanpa Mac lokal: logika inti diuji lewat `PLACore` (Swift 
 - **Beranda (F-01):** Banner peringatan, tugas terlambat, agenda hari ini, tagihan ≤ 7 hari, ringkasan keuangan (bisa disamarkan saat terkunci), maks. 3 kartu insight, tambah cepat `+`.
 - **Tugas & Pengingat (F-02 s.d. F-06):** Buat tugas ≤ 3 tap, Smart Reminder otomatis (H-7/H-3/H-1/Hari H/2 jam sebelum sesuai prioritas), tugas berulang (Harian/Mingguan/Bulanan dengan anchor tgl 29–31 & kabisat/Tahunan), antrean rolling 64 notifikasi + suara kustom `.caf` + aksi notifikasi + ringkasan pagi + jam tenang, reschedule cepat dengan saran hari paling longgar.
 - **Keuangan & Tagihan (F-07 s.d. F-12):** Dompet (Cash/Bank/E-wallet) + transfer bebas distorsi anggaran (dengan biaya admin opsional), catat transaksi ≤ 4 tap + saran kategori dari histori, anggaran bulanan total & per kategori dengan tanggal siklus fleksibel (1–28), tagihan berulang (Tandai Lunas ≤ 2 tap / nominal variabel / lewati siklus), proyeksi akhir bulan & batas aman harian dengan proteksi cold start, kunci Face ID + fallback passcode + blur App Switcher.
-- **Backup, Diagnostik & Onboarding (F-13 s.d. F-15):** Ekspor/pulihkan JSON ber-checksum SHA-256 & ekspor CSV UTF-8 BOM via iOS Files, pembaca masa berlaku sertifikat `embedded.mobileprovision` + pengingat H-2/H-1, paket diagnostik aman bebas data pribadi, katalog preview komponen UI, onboarding 3 langkah yang dapat dilewati.
+- **Backup, Diagnostik & Onboarding (F-13 s.d. F-15):** Ekspor/pulihkan JSON ber-checksum SHA-256 (skema v2 kompatibel mundur v1) & ekspor CSV UTF-8 BOM via iOS Files, pembaca masa berlaku sertifikat `embedded.mobileprovision` + pengingat H-2/H-1, paket diagnostik aman bebas data pribadi, katalog preview komponen UI, onboarding 3 langkah yang dapat dilewati.
+
+## Fitur Pasca-MVP (Fase 5–7, Tanpa App Extension / 1 App ID)
+
+- **Quick Add Bahasa Natural (P-01):** Ketik *"rapat besok jam 3 sore #kerja !tinggi"* dengan pratinjau chip real-time sebelum simpan (diuji pada 100 frasa Bahasa Indonesia, SC-P2).
+- **Siri Shortcuts / App Intents (P-02):** `AddTaskIntent`, `LogExpenseIntent`, dan `ScanReceiptIntent` langsung di target utama (`0` App ID tambahan).
+- **Target Tabungan (P-03) & Simulasi "Bagaimana Jika" (P-04):** Migrasi SQLite `v2_savings_goal` + hitung setoran bulanan & simulasi dampak rencana pembelian tanpa mengubah saldo.
+- **OCR Struk/Bukti Transfer Offline (P-05):** `Apple Vision` (`VNRecognizeTextRequest`) + parser struk Indonesia (BCA, Mandiri, GoPay, OVO, DANA, QRIS, retail) lewat PhotosPicker atau Shortcut Share Sheet; foto langsung dihapus pasca-ekstraksi.
+- **Smart Rescheduling Lanjutan (P-08) & Personal Intelligence (P-09):** Skor beban harian `(Tinggi×3 + Sedang×2 + Rendah×1)` + integrasi `EventKit` read-only opsional, serta usulan jam produktif (`R-PER-01`) dan pencegahan keterlambatan kategori (`R-PER-02`) dengan konfirmasi pengguna.
+- **Recurring "Dari Tanggal Selesai" (P-10) & Peringatan Akhir Masa Trial (P-11):** Migrasi SQLite `v3` untuk siklus relatif pasca-selesai dan pengingat tegas H-3 & H-1 sebelum trial langganan terdebit.
 
 ## Dokumentasi
 

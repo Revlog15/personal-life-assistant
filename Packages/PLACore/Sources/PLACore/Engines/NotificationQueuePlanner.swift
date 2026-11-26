@@ -136,17 +136,21 @@ public enum NotificationQueuePlanner {
                 let id = reminder.id.uuidString
                 guard seenIds.insert(id).inserted else { continue }
 
+                let title = bill.isTrial ? "Masa Trial Segera Berakhir" : "Pengingat Tagihan"
+                let body = bill.isTrial
+                    ? "Trial \(bill.name) berakhir \(bill.effectiveDueOrTrialEndDate.isoString) — batalkan sebelum terdebit otomatis."
+                    : "\(bill.name) jatuh tempo \(bill.nextDueDateLocal.isoString)"
                 let item = ScheduledNotificationItem(
                     id: id,
                     kind: .billReminder,
-                    title: "Pengingat Tagihan",
-                    body: "\(bill.name) jatuh tempo \(bill.nextDueDateLocal.isoString)",
+                    title: title,
+                    body: body,
                     fireDateLocal: fire,
                     soundName: reminder.soundName,
                     categoryIdentifier: "PLA_BILL_ACTION",
                     ownerId: bill.id
                 )
-                candidates.append(RankedCandidate(item: item, priorityRank: 2))
+                candidates.append(RankedCandidate(item: item, priorityRank: bill.isTrial ? 3 : 2))
             }
         }
 

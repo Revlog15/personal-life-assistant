@@ -47,6 +47,7 @@ struct RecurrenceRuleRecord: Codable, FetchableRecord, PersistableRecord {
     var anchorMonth: Int?
     var endDateLocal: String?
     var maxOccurrences: Int?
+    var anchorMode: Int
 
     init(domain: RecurrenceRule) {
         self.id = domain.id.uuidString
@@ -57,6 +58,7 @@ struct RecurrenceRuleRecord: Codable, FetchableRecord, PersistableRecord {
         self.anchorMonth = domain.anchorMonth
         self.endDateLocal = domain.endDateLocal?.isoString
         self.maxOccurrences = domain.maxOccurrences
+        self.anchorMode = domain.anchorMode.rawValue
     }
 
     func toDomain() throws -> RecurrenceRule {
@@ -67,7 +69,8 @@ struct RecurrenceRuleRecord: Codable, FetchableRecord, PersistableRecord {
             id: uuid, frequency: freq, interval: interval, weekdaysMask: weekdaysMask,
             anchorDayOfMonth: anchorDayOfMonth, anchorMonth: anchorMonth,
             endDateLocal: endDateLocal.flatMap(LocalDate.init(isoString:)),
-            maxOccurrences: maxOccurrences
+            maxOccurrences: maxOccurrences,
+            anchorMode: RecurrenceAnchorMode(rawValue: anchorMode) ?? .fixedSchedule
         )
     }
 }
@@ -293,6 +296,8 @@ struct BillRecord: Codable, FetchableRecord, PersistableRecord {
     var categoryId: String
     var isActive: Bool
     var lastPaidDateLocal: String?
+    var isTrial: Bool
+    var trialEndDateLocal: String?
     var createdAt: Double
     var updatedAt: Double
 
@@ -307,6 +312,8 @@ struct BillRecord: Codable, FetchableRecord, PersistableRecord {
         self.categoryId = domain.categoryId.uuidString
         self.isActive = domain.isActive
         self.lastPaidDateLocal = domain.lastPaidDateLocal?.isoString
+        self.isTrial = domain.isTrial
+        self.trialEndDateLocal = domain.trialEndDateLocal?.isoString
         self.createdAt = domain.createdAt.timeIntervalSince1970
         self.updatedAt = domain.updatedAt.timeIntervalSince1970
     }
@@ -324,6 +331,51 @@ struct BillRecord: Codable, FetchableRecord, PersistableRecord {
             nextDueDateLocal: due, recurrenceRuleId: ruleUUID, defaultAccountId: accUUID,
             categoryId: catUUID, isActive: isActive,
             lastPaidDateLocal: lastPaidDateLocal.flatMap(LocalDate.init(isoString:)),
+            isTrial: isTrial,
+            trialEndDateLocal: trialEndDateLocal.flatMap(LocalDate.init(isoString:)),
+            createdAt: Date(timeIntervalSince1970: createdAt),
+            updatedAt: Date(timeIntervalSince1970: updatedAt)
+        )
+    }
+}
+
+struct SavingsGoalRecord: Codable, FetchableRecord, PersistableRecord {
+    static let databaseTableName = "savings_goals"
+    var id: String
+    var name: String
+    var targetAmount: Int64
+    var currentAmount: Int64
+    var targetDateLocal: String?
+    var linkedAccountId: String?
+    var status: Int
+    var createdAt: Double
+    var updatedAt: Double
+
+    init(domain: SavingsGoal) {
+        self.id = domain.id.uuidString
+        self.name = domain.name
+        self.targetAmount = domain.targetAmount
+        self.currentAmount = domain.currentAmount
+        self.targetDateLocal = domain.targetDateLocal?.isoString
+        self.linkedAccountId = domain.linkedAccountId?.uuidString
+        self.status = domain.status.rawValue
+        self.createdAt = domain.createdAt.timeIntervalSince1970
+        self.updatedAt = domain.updatedAt.timeIntervalSince1970
+    }
+
+    func toDomain() throws -> SavingsGoal {
+        guard let uuid = UUID(uuidString: id),
+              let st = SavingsGoalStatus(rawValue: status) else {
+            throw PLADatabaseError.invalidStoredIdentifier(id)
+        }
+        return SavingsGoal(
+            id: uuid,
+            name: name,
+            targetAmount: targetAmount,
+            currentAmount: currentAmount,
+            targetDateLocal: targetDateLocal.flatMap(LocalDate.init(isoString:)),
+            linkedAccountId: linkedAccountId.flatMap(UUID.init(uuidString:)),
+            status: st,
             createdAt: Date(timeIntervalSince1970: createdAt),
             updatedAt: Date(timeIntervalSince1970: updatedAt)
         )
