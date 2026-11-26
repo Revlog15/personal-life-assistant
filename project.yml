@@ -65,7 +65,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: id.revand.pla
         PRODUCT_NAME: PLAApp
-        MARKETING_VERSION: "2.1.0"
+        MARKETING_VERSION: "2.2.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
@@ -102,13 +102,14 @@ targets:
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
           NSExtensionAttributes:
             NSExtensionActivationRule:
-              NSExtensionActivationSupportsImageWithMaxCount: 1
-              NSExtensionActivationSupportsFileWithMaxCount: 1
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+              NSExtensionActivationSupportsFileWithMaxCount: 10
+              NSExtensionActivationSupportsAttachmentsWithMaxCount: 10
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: id.revand.pla.share
         PRODUCT_NAME: PLAShareExtension
-        MARKETING_VERSION: "2.1.0"
+        MARKETING_VERSION: "2.2.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
@@ -147,7 +148,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: id.revand.pla.widget
         PRODUCT_NAME: PLAWidgetExtension
-        MARKETING_VERSION: "2.1.0"
+        MARKETING_VERSION: "2.2.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"

@@ -52,9 +52,13 @@ struct AccountFormSheet: View {
                 }
 
                 Section("Saldo Awal (≥ Rp0)") {
-                    TextField("0", text: $initialBalanceText)
-                        .monospacedDigit()
-                        .keyboardType(.numberPad)
+                    RupiahTextField(
+                        placeholder: "0",
+                        text: $initialBalanceText,
+                        allowZero: true,
+                        font: .title3.weight(.bold),
+                        accentColor: PLATokens.color(forToken: colorToken)
+                    )
                     if let bal = parsedInitialBalance {
                         Text("Saldo awal: \(PLAFormatters.rupiah(bal))")
                             .font(.caption)
@@ -147,10 +151,12 @@ struct BudgetFormSheet: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Contoh: 3.000.000", text: $amountText)
-                        .font(.title3.weight(.bold))
-                        .monospacedDigit()
-                        .keyboardType(.numbersAndPunctuation)
+                    RupiahTextField(
+                        placeholder: "Contoh: 3.000.000",
+                        text: $amountText,
+                        font: .title3.weight(.bold),
+                        accentColor: PLATokens.Colors.accent
+                    )
 
                     switch parsedResult {
                     case .success(let money):

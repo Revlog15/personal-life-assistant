@@ -100,12 +100,14 @@ struct ReceiptOCRReviewSheet: View {
                 Section("Tinjau & Koreksi Transaksi") {
                     VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                         Text("Nominal (Rupiah)")
-                            .font(.caption)
+                            .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
-                        TextField("Nominal pengeluaran", text: $amountText)
-                            .font(.title3.weight(.bold))
-                            .monospacedDigit()
-                            .keyboardType(.numbersAndPunctuation)
+                        RupiahTextField(
+                            placeholder: "Contoh: 45.000",
+                            text: $amountText,
+                            font: .title3.weight(.bold),
+                            accentColor: PLATokens.Colors.coral
+                        )
                         if case .failure(let err) = parsedAmount, !amountText.isEmpty {
                             Text(err.userMessage)
                                 .font(.caption)
@@ -226,7 +228,7 @@ struct ReceiptOCRReviewSheet: View {
         detectedSourceApp = sourceApp
 
         if let amount {
-            amountText = String(amount)
+            amountText = PLAFormatters.formatDigitsWithDots(String(amount))
         }
         if let date {
             selectedDate = date.toDate(minutesFromMidnight: 12 * 60, timeZone: store.clock.timeZone)

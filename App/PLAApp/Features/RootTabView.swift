@@ -14,6 +14,7 @@ enum QuickAddSheetKind: Identifiable {
     case income
     case transfer
     case scanReceipt
+    case whatIf
 
     var id: String {
         switch self {
@@ -22,6 +23,7 @@ enum QuickAddSheetKind: Identifiable {
         case .income: return "income"
         case .transfer: return "transfer"
         case .scanReceipt: return "scanReceipt"
+        case .whatIf: return "whatIf"
         }
     }
 }
@@ -107,6 +109,9 @@ struct RootTabView: View {
                     .environment(store)
             case .scanReceipt:
                 ReceiptOCRReviewSheet()
+                    .environment(store)
+            case .whatIf:
+                WhatIfSimulatorSheet()
                     .environment(store)
             }
         }

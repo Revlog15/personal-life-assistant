@@ -55,17 +55,24 @@ struct SavingsGoalFormSheet: View {
             Form {
                 Section("Detail Target Tabungan") {
                     TextField("Nama target (mis. Dana Darurat, Laptop Baru)", text: $name)
-                    TextField("Target nominal (mis. 10.000.000)", text: $targetAmountText)
-                        .monospacedDigit()
-                        .keyboardType(.numbersAndPunctuation)
+                    RupiahTextField(
+                        placeholder: "Target nominal (mis. 10.000.000)",
+                        text: $targetAmountText,
+                        font: .title3.weight(.bold),
+                        accentColor: PLATokens.Colors.violet
+                    )
                     if case .failure(let err) = parsedTarget, !targetAmountText.isEmpty {
                         Text(err.userMessage)
                             .font(.caption)
                             .foregroundStyle(PLATokens.Colors.danger)
                     }
-                    TextField("Terkumpul saat ini (default 0)", text: $currentAmountText)
-                        .monospacedDigit()
-                        .keyboardType(.numberPad)
+                    RupiahTextField(
+                        placeholder: "Terkumpul saat ini (default 0)",
+                        text: $currentAmountText,
+                        allowZero: true,
+                        font: .body.weight(.semibold),
+                        accentColor: PLATokens.Colors.safe
+                    )
                 }
 
                 Section("Tanggal Target & Akun (Opsional)") {
@@ -153,10 +160,12 @@ struct SavingsAllocateSheet: View {
                 }
 
                 Section(isWithdraw ? "Nominal Penarikan" : "Nominal Setoran") {
-                    TextField("Contoh: 500.000", text: $amountText)
-                        .font(.title3.weight(.bold))
-                        .monospacedDigit()
-                        .keyboardType(.numbersAndPunctuation)
+                    RupiahTextField(
+                        placeholder: "Contoh: 500.000",
+                        text: $amountText,
+                        font: .title3.weight(.bold),
+                        accentColor: isWithdraw ? PLATokens.Colors.coral : PLATokens.Colors.violet
+                    )
                     if case .failure(let err) = parsedAmount, !amountText.isEmpty {
                         Text(err.userMessage)
                             .font(.caption)
@@ -214,10 +223,12 @@ struct WhatIfSimulatorSheet: View {
             Form {
                 Section {
                     TextField("Rencana pembelian (opsional, mis. Headphone)", text: $itemLabel)
-                    TextField("Nominal rencana (mis. 750.000)", text: $plannedAmountText)
-                        .font(.title3.weight(.bold))
-                        .monospacedDigit()
-                        .keyboardType(.numbersAndPunctuation)
+                    RupiahTextField(
+                        placeholder: "Nominal rencana (mis. 750.000)",
+                        text: $plannedAmountText,
+                        font: .title3.weight(.bold),
+                        accentColor: PLATokens.Colors.violet
+                    )
                 } header: {
                     Text("Simulasi \"Bagaimana Jika\"")
                 } footer: {

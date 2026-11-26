@@ -72,10 +72,12 @@ struct TransferFormSheet: View {
                     }
 
                     Section {
-                        TextField("Nominal transfer (mis. 500.000)", text: $amountText)
-                            .font(.title3.weight(.bold))
-                            .monospacedDigit()
-                            .keyboardType(.numbersAndPunctuation)
+                        RupiahTextField(
+                            placeholder: "Nominal transfer (mis. 500.000)",
+                            text: $amountText,
+                            font: .title3.weight(.bold),
+                            accentColor: PLATokens.Colors.info
+                        )
 
                         if case .failure(let err) = parsedAmount, !amountText.isEmpty {
                             Text(err.userMessage)
@@ -83,9 +85,12 @@ struct TransferFormSheet: View {
                                 .foregroundStyle(PLATokens.Colors.danger)
                         }
 
-                        TextField("Biaya admin opsional (mis. 2.500)", text: $adminFeeText)
-                            .monospacedDigit()
-                            .keyboardType(.numbersAndPunctuation)
+                        RupiahTextField(
+                            placeholder: "Biaya admin opsional (mis. 2.500)",
+                            text: $adminFeeText,
+                            font: .body.weight(.semibold),
+                            accentColor: PLATokens.Colors.warning
+                        )
 
                         if let feeRes = parsedAdminFee, case .failure(let err) = feeRes {
                             Text(err.userMessage)

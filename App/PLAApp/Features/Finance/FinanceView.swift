@@ -20,9 +20,17 @@ enum FinanceSegment: Int, CaseIterable, Identifiable {
         case .savings: return "Tabungan"
         }
     }
+    var accentColor: Color {
+        switch self {
+        case .summary: return PLATokens.Colors.accent
+        case .transactions: return PLATokens.Colors.coral
+        case .bills: return PLATokens.Colors.rose
+        case .accounts: return PLATokens.Colors.info
+        case .budgets: return PLATokens.Colors.warning
+        case .savings: return PLATokens.Colors.violet
+        }
+    }
 }
-
-/// Complete Finance tab: Ringkasan (F-11), Transaksi (F-08), Tagihan (F-10), Akun (F-07), Anggaran (F-09).
 struct FinanceView: View {
     @Environment(AppStore.self) private var store
 
@@ -61,14 +69,15 @@ struct FinanceView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: PLATokens.Spacing.xs) {
                         ForEach(FinanceSegment.allCases) { item in
+                            let active = segment == item
                             Button(item.title) {
                                 segment = item
                             }
-                            .font(.subheadline.weight(segment == item ? .semibold : .regular))
+                            .font(.subheadline.weight(active ? .semibold : .medium))
                             .padding(.horizontal, PLATokens.Spacing.md)
                             .frame(minHeight: 36)
-                            .background(segment == item ? PLATokens.Colors.accent : Color(uiColor: .tertiarySystemFill))
-                            .foregroundStyle(segment == item ? Color.white : Color.primary)
+                            .background(active ? item.accentColor : PLATokens.Colors.surface)
+                            .foregroundStyle(active ? Color.white : Color.primary)
                             .clipShape(Capsule())
                             .buttonStyle(.plain)
                         }
@@ -76,6 +85,7 @@ struct FinanceView: View {
                     .padding(.horizontal, PLATokens.Spacing.lg)
                     .padding(.vertical, PLATokens.Spacing.sm)
                 }
+                .background(PLATokens.Colors.canvas)
 
                 switch segment {
                 case .summary:
@@ -215,42 +225,92 @@ struct FinanceView: View {
     private var summaryList: some View {
         let s = store.financialSummary
         return List {
+            // Committed Emerald-Teal Cash Flow Hero Card
             Section {
-                AdaptiveKeyValueRow {
-                    Text("Periode Aktif")
-                        .foregroundStyle(.secondary)
-                } trailing: {
-                    Text(PLAFormatters.periodRange(s.period))
-                        .font(.subheadline.weight(.medium))
+                PLAHeroCard(gradient: PLATokens.heroGradient) {
+                    VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Arus Kas Bersih")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Color.white.opacity(0.84))
+                                MoneyText(
+                                    amount: s.netCashFlow,
+                                    style: .title2.weight(.bold),
+                                    color: Color.white
+                                )
+                            }
+                            Spacer()
+                            StatusBadge(
+                                text: PLATokens.label(for: s.budgetStatus),
+                                icon: PLATokens.icon(for: s.budgetStatus),
+                                color: PLATokens.color(for: s.budgetStatus),
+                                onDarkSurface: true
+                            )
+                        }
+
+                        Text("\(PLAFormatters.periodRange(s.period)) • Hari ke-\(s.period.currentDay)/\(s.period.totalDays)")
+                            .font(.caption)
+                            .foregroundStyle(Color.white.opacity(0.82))
+
+                        Divider().overlay(Color.white.opacity(0.22))
+
+                        HStack(spacing: PLATokens.Spacing.lg) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Label("Pemasukan", systemImage: "arrow.down.left")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(Color.white.opacity(0.82))
+                                MoneyText(amount: s.totalIncome, style: .subheadline.weight(.bold), color: Color.white)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Label("Pengeluaran", systemImage: "arrow.up.right")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(Color.white.opacity(0.82))
+                                MoneyText(amount: s.totalExpense, style: .subheadline.weight(.bold), color: Color.white)
+                            }
+                        }
+                    }
                 }
-                AdaptiveKeyValueRow {
-                    Text("Hari Berjalan")
-                        .foregroundStyle(.secondary)
-                } trailing: {
-                    Text("Hari ke-\(s.period.currentDay) dari \(s.period.totalDays) (sisa \(s.period.remainingDaysInclusive) hari)")
-                        .font(.subheadline)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+            }
+
+            // Quick Tools Row: Scan OCR (Teal) + What-If Simulator (Violet)
+            Section {
+                HStack(spacing: PLATokens.Spacing.sm) {
+                    Button {
+                        showOCRScanSheet = true
+                    } label: {
+                        HStack(spacing: PLATokens.Spacing.sm) {
+                            PLAIconBadge(systemName: "doc.text.viewfinder", color: PLATokens.Colors.accent, size: 32)
+                            Text("Scan Struk OCR")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                        .padding(.horizontal, PLATokens.Spacing.sm)
+                        .background(PLATokens.Colors.surface, in: RoundedRectangle(cornerRadius: PLATokens.Radius.md, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        showWhatIfSheet = true
+                    } label: {
+                        HStack(spacing: PLATokens.Spacing.sm) {
+                            PLAIconBadge(systemName: "wand.and.stars", color: PLATokens.Colors.violet, size: 32)
+                            Text("Simulasi Beli")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                        .padding(.horizontal, PLATokens.Spacing.sm)
+                        .background(PLATokens.Colors.surface, in: RoundedRectangle(cornerRadius: PLATokens.Radius.md, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
                 }
-                AdaptiveKeyValueRow {
-                    Text("Total Pemasukan")
-                } trailing: {
-                    MoneyText(amount: s.totalIncome, color: PLATokens.Colors.safe)
-                }
-                AdaptiveKeyValueRow {
-                    Text("Total Pengeluaran")
-                } trailing: {
-                    MoneyText(amount: s.totalExpense, color: s.totalExpense > 0 ? .primary : .secondary)
-                }
-                AdaptiveKeyValueRow {
-                    Text("Arus Kas Bersih")
-                        .fontWeight(.semibold)
-                } trailing: {
-                    MoneyText(
-                        amount: s.netCashFlow,
-                        color: s.netCashFlow >= 0 ? PLATokens.Colors.safe : PLATokens.Colors.danger
-                    )
-                }
-            } header: {
-                Text("Arus Kas Periode")
+                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                .listRowBackground(Color.clear)
             }
 
             // Budget & Safe Daily Limit + Forecast (AC-11.1..11.3)
@@ -366,12 +426,27 @@ struct FinanceView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(s.topExpenseCategories) { cat in
-                        AdaptiveKeyValueRow {
-                            Text(cat.categoryName)
-                                .font(.body)
-                        } trailing: {
-                            MoneyText(amount: cat.totalSpent, style: .subheadline.weight(.semibold))
+                        let domainCat = store.categories.first { $0.id == cat.id }
+                        let catColor = domainCat.map { PLATokens.color(forToken: $0.colorToken) } ?? PLATokens.Colors.coral
+                        VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
+                            AdaptiveKeyValueRow {
+                                HStack(spacing: PLATokens.Spacing.md) {
+                                    PLAIconBadge(
+                                        systemName: domainCat?.iconName ?? "tag.fill",
+                                        color: catColor,
+                                        size: 32,
+                                        iconFont: .caption.weight(.bold)
+                                    )
+                                    Text(cat.categoryName)
+                                        .font(.body.weight(.medium))
+                                }
+                            } trailing: {
+                                MoneyText(amount: cat.totalSpent, style: .subheadline.weight(.bold))
+                            }
+                            ProgressView(value: min(max(cat.percentageOfVariable, 0), 1))
+                                .tint(catColor)
                         }
+                        .padding(.vertical, 2)
                     }
                 }
             }
@@ -391,6 +466,8 @@ struct FinanceView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(PLATokens.Colors.canvas)
     }
 
     // MARK: - 2. Transaksi (F-08, AC-08.4)
@@ -492,14 +569,16 @@ struct FinanceView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(PLATokens.Colors.canvas)
     }
 
     private func filterChip(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
         Button(title, action: action)
-            .font(.caption.weight(.medium))
+            .font(.caption.weight(.semibold))
             .padding(.horizontal, PLATokens.Spacing.md)
             .frame(minHeight: 34)
-            .background(active ? PLATokens.Colors.accent : Color(uiColor: .tertiarySystemFill))
+            .background(active ? PLATokens.Colors.coral : Color(uiColor: .tertiarySystemFill))
             .foregroundStyle(active ? Color.white : Color.primary)
             .clipShape(Capsule())
             .buttonStyle(.plain)
@@ -507,52 +586,63 @@ struct FinanceView: View {
 
     private func transactionRow(_ tx: PLATransaction) -> some View {
         let isFuture = tx.dateLocal > store.today
+        let cat = store.categories.first { $0.id == tx.categoryId }
+        let badgeColor: Color = tx.type == .transfer
+            ? PLATokens.Colors.info
+            : (cat.map { PLATokens.color(forToken: $0.colorToken) } ?? (tx.type == .income ? PLATokens.Colors.safe : PLATokens.Colors.coral))
+        let badgeIcon: String = tx.type == .transfer
+            ? "arrow.left.arrow.right"
+            : (cat?.iconName ?? (tx.type == .income ? "arrow.down.left" : "tag.fill"))
+
         return Button {
             if tx.type != .transfer {
                 editingTransaction = tx
             }
         } label: {
             AdaptiveKeyValueRow {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: PLATokens.Spacing.xs) {
-                        Text(tx.type == .transfer
-                             ? "Transfer: \(store.accountName(for: tx.accountId)) → \(store.accountName(for: tx.destinationAccountId))"
-                             : store.categoryName(for: tx.categoryId))
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(.primary)
-                        if isFuture {
-                            StatusBadge(text: "Mendatang", icon: "clock", color: PLATokens.Colors.info)
+                HStack(spacing: PLATokens.Spacing.md) {
+                    PLAIconBadge(systemName: badgeIcon, color: badgeColor, size: 36)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: PLATokens.Spacing.xs) {
+                            Text(tx.type == .transfer
+                                 ? "Transfer: \(store.accountName(for: tx.accountId)) → \(store.accountName(for: tx.destinationAccountId))"
+                                 : store.categoryName(for: tx.categoryId))
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.primary)
+                            if isFuture {
+                                StatusBadge(text: "Mendatang", icon: "clock", color: PLATokens.Colors.info)
+                            }
                         }
-                    }
 
-                    HStack(spacing: PLATokens.Spacing.sm) {
-                        Text(PLAFormatters.shortDate(tx.dateLocal))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if tx.type != .transfer {
-                            Text("• \(store.accountName(for: tx.accountId))")
+                        HStack(spacing: PLATokens.Spacing.sm) {
+                            Text(PLAFormatters.shortDate(tx.dateLocal))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            if tx.type != .transfer {
+                                Text("• \(store.accountName(for: tx.accountId))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if tx.billId != nil {
+                                Label("Tagihan", systemImage: "checkmark.seal.fill")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(PLATokens.Colors.rose)
+                            }
                         }
-                        if tx.billId != nil {
-                            Label("Tagihan", systemImage: "checkmark.seal.fill")
-                                .font(.caption2)
-                                .foregroundStyle(PLATokens.Colors.accent)
-                        }
-                    }
 
-                    if let note = tx.note, !note.isEmpty {
-                        Text(note)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                        if let note = tx.note, !note.isEmpty {
+                            Text(note)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
                     }
                 }
             } trailing: {
                 let prefix = tx.type == .income ? "+" : (tx.type == .expense ? "-" : "")
-                let color: Color = tx.type == .income ? PLATokens.Colors.safe : (tx.type == .transfer ? PLATokens.Colors.info : .primary)
+                let color: Color = tx.type == .income ? PLATokens.Colors.safe : (tx.type == .transfer ? PLATokens.Colors.info : PLATokens.Colors.coral)
                 Text("\(prefix)\(PLAFormatters.rupiah(tx.amount))")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.bold))
                     .monospacedDigit()
                     .foregroundStyle(color)
             }
@@ -607,40 +697,46 @@ struct FinanceView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(PLATokens.Colors.canvas)
     }
 
     private func billRow(_ bill: Bill, overdue: Bool) -> some View {
         let rule = store.recurrenceRule(for: bill.recurrenceRuleId)
+        let tint = bill.isTrial ? PLATokens.Colors.warning : (overdue ? PLATokens.Colors.danger : PLATokens.Colors.rose)
         return VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             AdaptiveKeyValueRow {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: PLATokens.Spacing.xs) {
-                        Text(bill.name)
-                            .font(.body.weight(.semibold))
-                        if bill.isTrial {
-                            StatusBadge(text: "Masa Trial", icon: "hourglass", color: PLATokens.Colors.warning)
-                        } else if overdue {
-                            StatusBadge(text: "Jatuh Tempo Terlewat", icon: "exclamationmark.triangle.fill", color: PLATokens.Colors.danger)
+                HStack(spacing: PLATokens.Spacing.md) {
+                    PLAIconBadge(systemName: bill.isTrial ? "hourglass" : "creditcard.fill", color: tint, size: 38)
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: PLATokens.Spacing.xs) {
+                            Text(bill.name)
+                                .font(.body.weight(.semibold))
+                            if bill.isTrial {
+                                StatusBadge(text: "Masa Trial", icon: "hourglass", color: PLATokens.Colors.warning)
+                            } else if overdue {
+                                StatusBadge(text: "Jatuh Tempo Terlewat", icon: "exclamationmark.triangle.fill", color: PLATokens.Colors.danger)
+                            }
                         }
-                    }
-                    Text(bill.isTrial
-                         ? "Trial berakhir: \(PLAFormatters.shortDate(bill.effectiveDueOrTrialEndDate)) (pengingat H-3 & H-1)"
-                         : "Jatuh tempo: \(PLAFormatters.shortDate(bill.nextDueDateLocal))")
-                        .font(.caption)
-                        .foregroundStyle(overdue ? PLATokens.Colors.danger : .secondary)
-                    HStack(spacing: PLATokens.Spacing.sm) {
-                        if let rule {
-                            Label(PLAFormatters.recurrenceLabel(rule), systemImage: "repeat")
+                        Text(bill.isTrial
+                             ? "Trial berakhir: \(PLAFormatters.shortDate(bill.effectiveDueOrTrialEndDate)) (pengingat H-3 & H-1)"
+                             : "Jatuh tempo: \(PLAFormatters.shortDate(bill.nextDueDateLocal))")
+                            .font(.caption)
+                            .foregroundStyle(overdue ? PLATokens.Colors.danger : .secondary)
+                        HStack(spacing: PLATokens.Spacing.sm) {
+                            if let rule {
+                                Label(PLAFormatters.recurrenceLabel(rule), systemImage: "repeat")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text("• \(store.accountName(for: bill.defaultAccountId))")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
-                        }
-                        Text("• \(store.accountName(for: bill.defaultAccountId))")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                        if bill.isVariableAmount {
-                            Text("• Estimasi")
-                                .font(.caption2)
-                                .foregroundStyle(PLATokens.Colors.info)
+                            if bill.isVariableAmount {
+                                Text("• Estimasi")
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(PLATokens.Colors.info)
+                            }
                         }
                     }
                 }
@@ -657,6 +753,7 @@ struct FinanceView: View {
                         .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(PLATokens.Colors.safe)
 
                 Button("Lewati") {
                     billToSkip = bill
@@ -688,31 +785,44 @@ struct FinanceView: View {
         let balances = store.accountBalances
         return List {
             Section {
-                AdaptiveKeyValueRow {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Total Kekayaan Cair")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text("\(store.activeAccounts.count) akun aktif")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                } trailing: {
-                    MoneyText(
-                        amount: store.totalLiquidWealth,
-                        style: .title3.weight(.bold),
-                        color: store.totalLiquidWealth < 0 ? PLATokens.Colors.danger : .primary
-                    )
-                }
+                PLAHeroCard(gradient: PLATokens.heroGradient) {
+                    VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Total Kekayaan Cair")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Color.white.opacity(0.84))
+                                MoneyText(
+                                    amount: store.totalLiquidWealth,
+                                    style: .title2.weight(.bold),
+                                    color: Color.white
+                                )
+                            }
+                            Spacer()
+                            StatusBadge(
+                                text: "\(store.activeAccounts.count) Akun",
+                                icon: "wallet.pass.fill",
+                                color: .white,
+                                onDarkSurface: true
+                            )
+                        }
 
-                Button {
-                    showTransfer = true
-                } label: {
-                    Label("Transfer Antar Akun", systemImage: "arrow.left.arrow.right.circle.fill")
-                        .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
+                        Button {
+                            showTransfer = true
+                        } label: {
+                            Label("Transfer Antar Akun", systemImage: "arrow.left.arrow.right.circle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(PLATokens.Colors.heroStart)
+                                .frame(maxWidth: .infinity, minHeight: 42)
+                                .background(Color.white, in: RoundedRectangle(cornerRadius: PLATokens.Radius.sm, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(store.activeAccounts.count < 2)
+                        .opacity(store.activeAccounts.count < 2 ? 0.55 : 1)
+                    }
                 }
-                .buttonStyle(.bordered)
-                .disabled(store.activeAccounts.count < 2)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
             }
 
             Section("Akun Aktif") {
@@ -745,30 +855,30 @@ struct FinanceView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(PLATokens.Colors.canvas)
     }
 
     private func accountRow(_ acc: Account, balance: Int64) -> some View {
-        Button {
+        let accColor = PLATokens.color(forToken: acc.colorToken)
+        return Button {
             editingAccount = acc
         } label: {
             AdaptiveKeyValueRow {
                 HStack(spacing: PLATokens.Spacing.md) {
-                    Image(systemName: acc.iconName)
-                        .font(.title3)
-                        .foregroundStyle(PLATokens.color(forToken: acc.colorToken))
-                        .frame(width: 30)
+                    PLAIconBadge(systemName: acc.iconName, color: accColor, size: 38)
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: PLATokens.Spacing.xs) {
                             Text(acc.name)
-                                .font(.body.weight(.medium))
+                                .font(.body.weight(.semibold))
                                 .foregroundStyle(.primary)
                             if acc.isDefault {
                                 Text("Utama")
                                     .font(.caption2.weight(.semibold))
-                                    .padding(.horizontal, 6)
+                                    .padding(.horizontal, 7)
                                     .padding(.vertical, 2)
-                                    .background(PLATokens.Colors.accent.opacity(0.16), in: Capsule())
-                                    .foregroundStyle(PLATokens.Colors.accent)
+                                    .background(accColor.opacity(0.16), in: Capsule())
+                                    .foregroundStyle(accColor)
                             }
                         }
                         Text(PLAFormatters.accountTypeLabel(acc.type))
@@ -871,8 +981,17 @@ struct FinanceView: View {
                     } label: {
                         VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                             AdaptiveKeyValueRow {
-                                Label(cat.name, systemImage: cat.iconName)
-                                    .foregroundStyle(.primary)
+                                HStack(spacing: PLATokens.Spacing.md) {
+                                    PLAIconBadge(
+                                        systemName: cat.iconName,
+                                        color: PLATokens.color(forToken: cat.colorToken),
+                                        size: 32,
+                                        iconFont: .caption.weight(.bold)
+                                    )
+                                    Text(cat.name)
+                                        .font(.body.weight(.medium))
+                                        .foregroundStyle(.primary)
+                                }
                             } trailing: {
                                 if catSum?.budgetAmount != nil, let pct = catSum?.percentageOfBudget {
                                     StatusBadge(
@@ -908,18 +1027,46 @@ struct FinanceView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(PLATokens.Colors.canvas)
     }
 
     // MARK: - 6. Target Tabungan (P-03)
 
     private var savingsList: some View {
-        List {
+        let totalSaved = store.activeSavingsGoals.reduce(Int64(0)) { $0 + $1.currentAmount }
+        let totalTarget = store.activeSavingsGoals.reduce(Int64(0)) { $0 + $1.targetAmount }
+        return List {
+            if !store.activeSavingsGoals.isEmpty {
+                Section {
+                    PLAHeroCard(gradient: PLATokens.savingsGradient) {
+                        VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+                            Text("Total Tabungan Terkumpul")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Color.white.opacity(0.84))
+                            MoneyText(amount: totalSaved, style: .title2.weight(.bold), color: Color.white)
+                            if totalTarget > 0 {
+                                ProgressView(value: min(Double(totalSaved) / Double(totalTarget), 1.0))
+                                    .tint(Color.white)
+                                    .background(Color.white.opacity(0.24), in: Capsule())
+                                Text("Dari total target \(PLAFormatters.rupiah(totalTarget))")
+                                    .font(.caption)
+                                    .foregroundStyle(Color.white.opacity(0.84))
+                            }
+                        }
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                }
+            }
+
             if store.activeSavingsGoals.isEmpty {
                 Section {
                     PLAEmptyStateView(
                         title: "Belum Ada Target Tabungan",
                         message: "Buat target tabungan seperti Dana Darurat atau Laptop Baru untuk menghitung setoran bulanan secara otomatis.",
                         systemImage: "target",
+                        tint: PLATokens.Colors.violet,
                         actionTitle: "Tambah Target Tabungan",
                         action: { showAddSavingsGoal = true }
                     )
@@ -934,19 +1081,25 @@ struct FinanceView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(PLATokens.Colors.canvas)
     }
 
     private func savingsGoalRow(_ goal: SavingsGoal) -> some View {
         let prog = SavingsGoalCalculator.evaluate(goal: goal, today: store.today)
+        let goalTint = prog.paceStatus == .achieved ? PLATokens.Colors.safe : PLATokens.Colors.violet
         return VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             AdaptiveKeyValueRow {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(goal.name)
-                        .font(.body.weight(.semibold))
-                    if let targetDate = goal.targetDateLocal {
-                        Text("Target: \(PLAFormatters.shortDate(targetDate))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                HStack(spacing: PLATokens.Spacing.md) {
+                    PLAIconBadge(systemName: prog.paceStatus == .achieved ? "checkmark.seal.fill" : "target", color: goalTint, size: 36)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(goal.name)
+                            .font(.body.weight(.semibold))
+                        if let targetDate = goal.targetDateLocal {
+                            Text("Target: \(PLAFormatters.shortDate(targetDate))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             } trailing: {
@@ -956,12 +1109,12 @@ struct FinanceView: View {
                     Text("\(Int((prog.percentComplete * 100).rounded()))%")
                         .font(.subheadline.weight(.bold))
                         .monospacedDigit()
-                        .foregroundStyle(PLATokens.Colors.accent)
+                        .foregroundStyle(PLATokens.Colors.violet)
                 }
             }
 
             ProgressView(value: prog.percentComplete)
-                .tint(prog.paceStatus == .achieved ? PLATokens.Colors.safe : PLATokens.Colors.accent)
+                .tint(goalTint)
 
             AdaptiveKeyValueRow {
                 Text("Terkumpul: \(PLAFormatters.rupiah(goal.currentAmount))")
@@ -969,13 +1122,13 @@ struct FinanceView: View {
                     .foregroundStyle(.secondary)
             } trailing: {
                 Text("Target: \(PLAFormatters.rupiah(goal.targetAmount))")
-                    .font(.caption.weight(.medium))
+                    .font(.caption.weight(.semibold))
             }
 
             if let monthly = prog.requiredMonthlyDeposit, monthly > 0 {
                 Text("Butuh setor \(PLAFormatters.rupiah(monthly))/bulan agar tercapai tepat waktu.")
-                    .font(.caption)
-                    .foregroundStyle(PLATokens.Colors.accent)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(PLATokens.Colors.violet)
             }
 
             HStack(spacing: PLATokens.Spacing.sm) {
@@ -987,6 +1140,7 @@ struct FinanceView: View {
                         .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(PLATokens.Colors.violet)
 
                 Button("Tarik") {
                     allocateSavingsTarget = SavingsAllocateRequest(goal: goal, isWithdraw: true)

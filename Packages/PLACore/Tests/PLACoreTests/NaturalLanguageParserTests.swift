@@ -174,4 +174,29 @@ final class NaturalLanguageParserTests: XCTestCase {
         print("SC-P2 Natural Language accuracy: \(correctCount)/100 (\(String(format: "%.1f", accuracy))%)")
         XCTAssertGreaterThanOrEqual(correctCount, 90, "SC-P2 failed (<90%): \(mismatches.joined(separator: "\n"))")
     }
+
+    func testEnglishAndBilingualQuickAddPhrases() {
+        // Exact user real-device Siri phrase: "meeting with dimas at 3 oclock"
+        let p1 = NaturalLanguageTaskParser.parse("meeting with dimas at 3 oclock", today: today, categories: cats)
+        XCTAssertEqual(p1.title, "meeting with dimas")
+        XCTAssertEqual(p1.dueDate, today)
+        XCTAssertEqual(p1.dueTimeMinutes, 15 * 60)
+
+        let p2 = NaturalLanguageTaskParser.parse("Call Dimas tomorrow at 9:30 am #kerja high priority", today: today, categories: cats)
+        XCTAssertEqual(p2.title, "Call Dimas")
+        XCTAssertEqual(p2.dueDate, today.addingDays(1))
+        XCTAssertEqual(p2.dueTimeMinutes, 9 * 60 + 30)
+        XCTAssertEqual(p2.priority, .high)
+        XCTAssertEqual(p2.matchedCategoryId, catKerja.id)
+
+        let p3 = NaturalLanguageTaskParser.parse("Gym tonight", today: today, categories: cats)
+        XCTAssertEqual(p3.title, "Gym")
+        XCTAssertEqual(p3.dueDate, today)
+        XCTAssertEqual(p3.dueTimeMinutes, 20 * 60)
+
+        let p4 = NaturalLanguageTaskParser.parse("Submit report next monday at 10 o'clock", today: today, categories: cats)
+        XCTAssertEqual(p4.title, "Submit report")
+        XCTAssertEqual(p4.dueDate, LocalDate(year: 2026, month: 11, day: 30))
+        XCTAssertEqual(p4.dueTimeMinutes, 10 * 60)
+    }
 }

@@ -73,19 +73,21 @@ struct TransactionFormSheet: View {
 
                     VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                         Text("Nominal (Rupiah)")
-                            .font(.caption)
+                            .font(.caption.weight(.medium))
                             .foregroundStyle(.secondary)
-                        TextField("Contoh: 50.000", text: $amountText)
-                            .font(.title2.weight(.bold))
-                            .monospacedDigit()
-                            .keyboardType(.numbersAndPunctuation)
-                            .focused($isAmountFocused)
+                        RupiahTextField(
+                            placeholder: "Contoh: 50.000",
+                            text: $amountText,
+                            font: .title2.weight(.bold),
+                            accentColor: txType == .income ? PLATokens.Colors.safe : PLATokens.Colors.coral
+                        )
+                        .focused($isAmountFocused)
 
                         switch parsedAmountResult {
                         case .success(let money):
                             Text(PLAFormatters.rupiah(money.rupiah))
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(PLATokens.Colors.accent)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(txType == .income ? PLATokens.Colors.safe : PLATokens.Colors.accent)
                         case .failure(let err):
                             if !amountText.isEmpty {
                                 Text(err.userMessage)
@@ -105,15 +107,16 @@ struct TransactionFormSheet: View {
                             HStack(spacing: PLATokens.Spacing.sm) {
                                 ForEach(suggestedCategories) { cat in
                                     let active = selectedCategoryId == cat.id
+                                    let catColor = PLATokens.color(forToken: cat.colorToken)
                                     Button {
                                         selectedCategoryId = cat.id
                                     } label: {
                                         Label(cat.name, systemImage: cat.iconName)
-                                            .font(.subheadline.weight(.medium))
+                                            .font(.subheadline.weight(.semibold))
                                             .padding(.horizontal, PLATokens.Spacing.md)
                                             .frame(minHeight: PLATokens.minTouchTarget)
-                                            .background(active ? PLATokens.Colors.accent : Color(uiColor: .tertiarySystemFill))
-                                            .foregroundStyle(active ? Color.white : Color.primary)
+                                            .background(active ? catColor : catColor.opacity(0.14))
+                                            .foregroundStyle(active ? Color.white : catColor)
                                             .clipShape(Capsule())
                                     }
                                     .buttonStyle(.plain)

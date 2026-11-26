@@ -26,24 +26,156 @@ struct AdaptiveKeyValueRow<Leading: View, Trailing: View>: View {
     }
 }
 
+/// Consistent tinted SF Symbol icon container giving each domain/category an instant chromatic anchor.
+struct PLAIconBadge: View {
+    let systemName: String
+    let color: Color
+    var size: CGFloat = 34
+    var iconFont: Font = .subheadline.weight(.semibold)
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                .fill(color.opacity(0.16))
+            Image(systemName: systemName)
+                .font(iconFont)
+                .foregroundStyle(color)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Committed brand-colored hero container with directional depth shadow (never flat monochrome).
+struct PLAHeroCard<Content: View>: View {
+    var gradient: LinearGradient = PLATokens.heroGradient
+    private let content: Content
+
+    init(gradient: LinearGradient = PLATokens.heroGradient, @ViewBuilder content: () -> Content) {
+        self.gradient = gradient
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .padding(PLATokens.Spacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: PLATokens.Radius.lg, style: .continuous)
+                    .fill(gradient)
+                    .shadow(color: Color.black.opacity(0.14), radius: 12, x: 0, y: 6)
+            )
+    }
+}
+
+/// Domain-tinted quick action pill button for fast 1-tap Dashboard workflows.
+struct PLAQuickActionPill: View {
+    let title: String
+    let systemImage: String
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(color.opacity(0.16))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: systemImage)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(color)
+                }
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 72)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: PLATokens.Radius.md, style: .continuous)
+                    .fill(PLATokens.Colors.surface)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Live dot-formatted Indonesian Rupiah input field (`1000000` -> `1.000.000` as you type).
+struct RupiahTextField: View {
+    let placeholder: String
+    @Binding var text: String
+    var allowZero: Bool = false
+    var font: Font = .title3.weight(.bold)
+    var accentColor: Color = PLATokens.Colors.accent
+
+    var body: some View {
+        HStack(spacing: PLATokens.Spacing.sm) {
+            Text("Rp")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(accentColor)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            TextField(placeholder, text: $text)
+                .font(font)
+                .monospacedDigit()
+                .keyboardType(.numberPad)
+                .onChange(of: text) { _, newValue in
+                    let formatted = PLAFormatters.formatDigitsWithDots(newValue, allowZero: allowZero)
+                    if formatted != newValue {
+                        text = formatted
+                    }
+                }
+                .onAppear {
+                    if !text.isEmpty {
+                        let formatted = PLAFormatters.formatDigitsWithDots(text, allowZero: allowZero)
+                        if formatted != text {
+                            text = formatted
+                        }
+                    }
+                }
+
+            if !text.isEmpty && !(allowZero && text == "0") {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                        .frame(minWidth: 32, minHeight: 32)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Hapus nominal")
+            }
+        }
+    }
+}
+
 /// Non-color-only semantic badge (icon + text, WCAG AA contrast).
 struct StatusBadge: View {
     let text: String
     let icon: String
     let color: Color
+    var onDarkSurface: Bool = false
 
     var body: some View {
         Label(text, systemImage: icon)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(color)
+            .foregroundStyle(onDarkSurface ? Color.white : color)
             .padding(.horizontal, PLATokens.Spacing.sm)
             .padding(.vertical, PLATokens.Spacing.xs)
-            .background(color.opacity(0.14), in: Capsule())
+            .background(
+                (onDarkSurface ? Color.white.opacity(0.20) : color.opacity(0.15)),
+                in: Capsule()
+            )
             .accessibilityElement(children: .combine)
     }
 }
 
-/// Tabular-numeral Rupiah label for crisp financial scanning.
+/// Tabular-numeral Rupiah label for crisp financial scanning (`Rp1.000.000`).
 struct MoneyText: View {
     let amount: Int64
     var masked: Bool = false
@@ -59,30 +191,36 @@ struct MoneyText: View {
     }
 }
 
-/// Reusable empty state using native iOS 17 ContentUnavailableView with 1 clear CTA (PRD §12).
+/// Reusable empty state using native iOS 17 ContentUnavailableView with domain-colored accent & clear CTA.
 struct PLAEmptyStateView: View {
     let title: String
     let message: String
     let systemImage: String
+    var tint: Color = PLATokens.Colors.accent
     var actionTitle: String? = nil
     var action: (() -> Void)? = nil
 
     var body: some View {
         ContentUnavailableView {
-            Label(title, systemImage: systemImage)
+            VStack(spacing: PLATokens.Spacing.sm) {
+                PLAIconBadge(systemName: systemImage, color: tint, size: 54, iconFont: .title2.weight(.semibold))
+                Text(title)
+                    .font(.headline)
+            }
         } description: {
             Text(message)
         } actions: {
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .buttonStyle(.borderedProminent)
+                    .tint(tint)
                     .frame(minHeight: PLATokens.minTouchTarget)
             }
         }
     }
 }
 
-/// Insight card with severity icon, copy, 👍/👎 feedback (SC-16), and dismiss button (AC-11.4).
+/// Insight card with tinted severity badge, copy, 👍/👎 feedback (SC-16), and dismiss button (AC-11.4).
 struct InsightCardView: View {
     let insight: FinancialInsight
     let currentFeedback: Int?
@@ -94,11 +232,13 @@ struct InsightCardView: View {
         let color = PLATokens.color(for: insight.severity)
 
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-            HStack(alignment: .top, spacing: PLATokens.Spacing.sm) {
-                Image(systemName: PLATokens.icon(for: insight.severity))
-                    .foregroundStyle(color)
-                    .font(.title3)
-                    .accessibilityHidden(true)
+            HStack(alignment: .top, spacing: PLATokens.Spacing.md) {
+                PLAIconBadge(
+                    systemName: PLATokens.icon(for: insight.severity),
+                    color: color,
+                    size: 38,
+                    iconFont: .body.weight(.semibold)
+                )
 
                 VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                     Text(copy.title)
@@ -124,7 +264,7 @@ struct InsightCardView: View {
                         .frame(minWidth: PLATokens.minTouchTarget, minHeight: PLATokens.minTouchTarget)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(currentFeedback == 1 ? PLATokens.Colors.accent : .secondary)
+                .foregroundStyle(currentFeedback == 1 ? PLATokens.Colors.safe : .secondary)
                 .accessibilityLabel("Insight berguna")
 
                 Button {
@@ -149,7 +289,7 @@ struct InsightCardView: View {
     }
 }
 
-/// Non-intrusive bottom toast with optional Undo button (AC-02.3: 5-second Urungkan).
+/// Non-intrusive bottom toast with semantic emerald checkmark & optional Undo pill (AC-02.3: 5-second Urungkan).
 struct ToastBannerView: View {
     let message: String
     let undoTitle: String?
@@ -157,6 +297,10 @@ struct ToastBannerView: View {
 
     var body: some View {
         HStack(spacing: PLATokens.Spacing.md) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(PLATokens.Colors.safe)
+
             Text(message)
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(.primary)
@@ -167,13 +311,15 @@ struct ToastBannerView: View {
                 Button(undoTitle, action: onUndo)
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(PLATokens.Colors.accent)
-                    .frame(minWidth: PLATokens.minTouchTarget, minHeight: PLATokens.minTouchTarget)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 34)
+                    .background(PLATokens.Colors.accent.opacity(0.14), in: Capsule())
             }
         }
         .padding(.horizontal, PLATokens.Spacing.lg)
         .padding(.vertical, PLATokens.Spacing.sm)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: PLATokens.Radius.md, style: .continuous))
-        .shadow(color: Color.black.opacity(0.12), radius: 8, y: 4)
+        .shadow(color: Color.black.opacity(0.16), radius: 10, x: 0, y: 5)
         .padding(.horizontal, PLATokens.Spacing.lg)
     }
 }
@@ -189,11 +335,8 @@ struct AlertBannerRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-            HStack(alignment: .top, spacing: PLATokens.Spacing.sm) {
-                Image(systemName: icon)
-                    .foregroundStyle(tint)
-                    .font(.title3)
-                    .accessibilityHidden(true)
+            HStack(alignment: .top, spacing: PLATokens.Spacing.md) {
+                PLAIconBadge(systemName: icon, color: tint, size: 36)
                 VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
@@ -206,8 +349,9 @@ struct AlertBannerRow: View {
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .font(.footnote.weight(.semibold))
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
                     .tint(tint)
+                    .controlSize(.small)
                     .frame(minHeight: PLATokens.minTouchTarget)
             }
         }
@@ -215,7 +359,7 @@ struct AlertBannerRow: View {
     }
 }
 
-/// P-09: Personal Intelligence opt-in suggestion card (R-PER-01 & R-PER-02) requiring explicit user confirmation.
+/// P-09: Personal Intelligence opt-in suggestion card (R-PER-01 & R-PER-02) with distinct Violet intelligence accent.
 struct PersonalSuggestionRow: View {
     let suggestion: PersonalSuggestion
     let onAccept: () -> Void
@@ -223,11 +367,8 @@ struct PersonalSuggestionRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-            HStack(alignment: .top, spacing: PLATokens.Spacing.sm) {
-                Image(systemName: iconName)
-                    .font(.title3)
-                    .foregroundStyle(PLATokens.Colors.accent)
-                    .accessibilityHidden(true)
+            HStack(alignment: .top, spacing: PLATokens.Spacing.md) {
+                PLAIconBadge(systemName: iconName, color: PLATokens.Colors.violet, size: 38)
                 VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                     Text(titleText)
                         .font(.subheadline.weight(.semibold))
@@ -242,6 +383,7 @@ struct PersonalSuggestionRow: View {
             HStack(spacing: PLATokens.Spacing.sm) {
                 Button(acceptLabel, action: onAccept)
                     .buttonStyle(.borderedProminent)
+                    .tint(PLATokens.Colors.violet)
                     .controlSize(.small)
                     .frame(minHeight: PLATokens.minTouchTarget)
                 Button("Nanti Saja", action: onDismiss)

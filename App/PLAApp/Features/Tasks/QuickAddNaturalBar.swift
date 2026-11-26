@@ -1,7 +1,7 @@
 import SwiftUI
 import PLACore
 
-/// P-01: Inline Indonesian natural-language quick-add bar with live parsed preview chips before saving.
+/// P-01: Bilingual Indonesian + English natural-language quick-add bar with vibrant live parsed preview chips.
 struct QuickAddNaturalBar: View {
     @Environment(AppStore.self) private var store
     @State private var phrase: String = ""
@@ -17,11 +17,14 @@ struct QuickAddNaturalBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             HStack(spacing: PLATokens.Spacing.sm) {
-                Image(systemName: "text.badge.plus")
-                    .foregroundStyle(PLATokens.Colors.accent)
-                    .accessibilityHidden(true)
+                PLAIconBadge(
+                    systemName: "sparkles",
+                    color: PLATokens.Colors.indigo,
+                    size: 32,
+                    iconFont: .caption.weight(.bold)
+                )
 
-                TextField("Ketik cepat: rapat besok jam 3 sore #kerja !tinggi", text: $phrase)
+                TextField("Ketik cepat: rapat besok jam 3 sore / meeting at 3pm", text: $phrase)
                     .submitLabel(.done)
                     .onSubmit {
                         submit()
@@ -32,6 +35,7 @@ struct QuickAddNaturalBar: View {
                         submit()
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(PLATokens.Colors.indigo)
                     .controlSize(.small)
                     .frame(minHeight: 36)
                 }
@@ -49,13 +53,13 @@ struct QuickAddNaturalBar: View {
                                 StatusBadge(
                                     text: PLAFormatters.relativeDayLabel(due, today: store.today),
                                     icon: "calendar",
-                                    color: PLATokens.Colors.accent
+                                    color: PLATokens.Colors.indigo
                                 )
                             }
                             if let mins = preview.dueTimeMinutes {
                                 StatusBadge(
                                     text: PLAFormatters.time24(mins),
-                                    icon: "clock",
+                                    icon: "clock.fill",
                                     color: PLATokens.Colors.info
                                 )
                             }
@@ -67,10 +71,12 @@ struct QuickAddNaturalBar: View {
                                 )
                             }
                             if let catId = preview.matchedCategoryId {
+                                let cat = store.categories.first { $0.id == catId }
+                                let color = cat.map { PLATokens.color(forToken: $0.colorToken) } ?? PLATokens.Colors.accent
                                 StatusBadge(
                                     text: store.categoryName(for: catId),
                                     icon: "tag.fill",
-                                    color: PLATokens.Colors.accent
+                                    color: color
                                 )
                             } else if let rawTag = preview.rawCategoryTag {
                                 StatusBadge(

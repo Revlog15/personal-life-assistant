@@ -17,10 +17,15 @@ struct FinanceGateView: View {
                     VStack(spacing: PLATokens.Spacing.xl) {
                         Spacer()
 
-                        Image(systemName: "lock.shield.fill")
-                            .font(.system(size: 56))
-                            .foregroundStyle(PLATokens.Colors.accent)
-                            .accessibilityHidden(true)
+                        ZStack {
+                            Circle()
+                                .fill(PLATokens.Colors.accent.opacity(0.14))
+                                .frame(width: 112, height: 112)
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 50))
+                                .foregroundStyle(PLATokens.Colors.accent)
+                        }
+                        .accessibilityHidden(true)
 
                         VStack(spacing: PLATokens.Spacing.sm) {
                             Text("Keuangan Terkunci")
@@ -34,7 +39,7 @@ struct FinanceGateView: View {
 
                         if let err = store.authService.lastErrorMessage {
                             Text(err)
-                                .font(.footnote)
+                                .font(.footnote.weight(.medium))
                                 .foregroundStyle(PLATokens.Colors.danger)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, PLATokens.Spacing.xl)
@@ -53,10 +58,13 @@ struct FinanceGateView: View {
                             .frame(maxWidth: 260, minHeight: PLATokens.minTouchTarget)
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(PLATokens.Colors.accent)
                         .disabled(store.authService.isAuthenticating)
 
                         Spacer()
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(PLATokens.Colors.canvas)
                     .navigationTitle("Keuangan")
                     .onAppear {
                         if !hasAutoPromptedThisVisit {

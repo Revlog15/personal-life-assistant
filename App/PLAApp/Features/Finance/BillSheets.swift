@@ -58,9 +58,12 @@ struct BillFormSheet: View {
             Form {
                 Section("Detail Tagihan") {
                     TextField("Nama tagihan (mis. Listrik PLN, Internet, Kos)", text: $name)
-                    TextField("Nominal / estimasi (mis. 350.000)", text: $amountText)
-                        .monospacedDigit()
-                        .keyboardType(.numbersAndPunctuation)
+                    RupiahTextField(
+                        placeholder: "Nominal / estimasi (mis. 350.000)",
+                        text: $amountText,
+                        font: .title3.weight(.bold),
+                        accentColor: PLATokens.Colors.rose
+                    )
                     if case .failure(let err) = parsedAmount, !amountText.isEmpty {
                         Text(err.userMessage)
                             .font(.caption)
@@ -214,10 +217,12 @@ struct PayBillSheet: View {
                 }
 
                 Section(bill.isVariableAmount ? "Nominal Aktual Bulan Ini" : "Nominal Tagihan") {
-                    TextField("Nominal aktual", text: $actualAmountText)
-                        .font(.title3.weight(.bold))
-                        .monospacedDigit()
-                        .keyboardType(.numbersAndPunctuation)
+                    RupiahTextField(
+                        placeholder: "Nominal aktual",
+                        text: $actualAmountText,
+                        font: .title3.weight(.bold),
+                        accentColor: PLATokens.Colors.safe
+                    )
 
                     if case .failure(let err) = parsedAmount {
                         Text(err.userMessage)

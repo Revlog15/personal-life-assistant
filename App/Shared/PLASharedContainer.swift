@@ -16,7 +16,7 @@ struct PLAAppGroupStatus: Equatable, Sendable {
 
 /// Resolves the active App Group dynamically for both Xcode builds (`group.id.revand.pla`)
 /// and SideStore/AltStore free Apple ID builds (which remap group IDs with a Team ID suffix via `ALTAppGroups` or `embedded.mobileprovision`).
-/// Gracefully degrades when App Groups are unavailable so the app never crashes (PRD V-07 & R-07).
+/// Checks both current bundle and containing parent `.app` bundle when running inside an extension so all 3 targets stay aligned.
 enum PLASharedContainer {
     static let defaultAppGroupId = "group.id.revand.pla"
     private static let widgetSnapshotFilename = "pla_widget_snapshot_v1.json"
@@ -31,22 +31,53 @@ enum PLASharedContainer {
     }
 
     static func resolve() -> Resolution {
-        // 1. SideStore / AltStore remapped App Group IDs in Info.plist (`ALTAppGroups`)
-        if let altGroups = Bundle.main.infoDictionary?["ALTAppGroups"] as? [String],
-           let first = altGroups.first(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
-            let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: first)
-            return Resolution(groupId: first, source: "ALTAppGroups", containerURL: url)
+        var candidates: [(id: String, source: String)] = []
+
+        // 1. Current bundle Info.plist `ALTAppGroups` (SideStore / AltStore remapped)
+        if let altGroups = Bundle.main.infoDictionary?["ALTAppGroups"] as? [String] {
+            for g in altGroups where !g.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                candidates.append((g, "ALTAppGroups"))
+            }
         }
 
-        // 2. Provisioning profile entitlements (`embedded.mobileprovision`) — works in main app & extensions
-        if let profileGroup = readAppGroupFromEmbeddedProvisioningProfile() {
-            let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: profileGroup)
-            return Resolution(groupId: profileGroup, source: "embedded.mobileprovision", containerURL: url)
+        // 2. Containing parent `.app` bundle `ALTAppGroups` (when running inside PlugIns/*.appex)
+        if Bundle.main.bundleURL.pathExtension == "appex" {
+            let parentAppURL = Bundle.main.bundleURL
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+            if let parentBundle = Bundle(url: parentAppURL) {
+                if let parentAltGroups = parentBundle.infoDictionary?["ALTAppGroups"] as? [String] {
+                    for g in parentAltGroups where !g.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        candidates.append((g, "parent-ALTAppGroups"))
+                    }
+                }
+                if let parentProfileGroup = readAppGroupFromProvisioningProfile(in: parentBundle) {
+                    candidates.append((parentProfileGroup, "parent-mobileprovision"))
+                }
+            }
         }
 
-        // 3. Default App Group ID (standard Xcode / paid team builds)
-        let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: defaultAppGroupId)
-        return Resolution(groupId: defaultAppGroupId, source: "default", containerURL: url)
+        // 3. Current bundle `embedded.mobileprovision`
+        if let profileGroup = readAppGroupFromProvisioningProfile(in: Bundle.main) {
+            candidates.append((profileGroup, "embedded.mobileprovision"))
+        }
+
+        // 4. Default App Group ID
+        candidates.append((defaultAppGroupId, "default"))
+
+        // Pick first candidate whose shared container URL is actually accessible
+        var seen: Set<String> = []
+        var firstCandidate: (id: String, source: String)? = nil
+        for candidate in candidates {
+            guard seen.insert(candidate.id).inserted else { continue }
+            if firstCandidate == nil { firstCandidate = candidate }
+            if let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: candidate.id) {
+                return Resolution(groupId: candidate.id, source: candidate.source, containerURL: url)
+            }
+        }
+
+        let fallback = firstCandidate ?? (defaultAppGroupId, "default")
+        return Resolution(groupId: fallback.id, source: fallback.source, containerURL: nil)
     }
 
     static func status() -> PLAAppGroupStatus {
@@ -190,8 +221,8 @@ enum PLASharedContainer {
 
     // MARK: - Provisioning Profile XML Parser
 
-    private static func readAppGroupFromEmbeddedProvisioningProfile() -> String? {
-        guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
+    private static func readAppGroupFromProvisioningProfile(in bundle: Bundle) -> String? {
+        guard let url = bundle.url(forResource: "embedded", withExtension: "mobileprovision"),
               let rawData = try? Data(contentsOf: url),
               let content = String(data: rawData, encoding: .isoLatin1),
               let startRange = content.range(of: "<plist"),

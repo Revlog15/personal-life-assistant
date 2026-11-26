@@ -21,14 +21,47 @@ enum PLAFormatters {
         "", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"
     ]
 
-    /// Deterministic Indonesian Rupiah string independent of device locale settings.
+    /// Deterministic Indonesian Rupiah string independent of device locale settings (`Rp1.500.000`).
     static func rupiah(_ amount: Int64) -> String {
         let isNegative = amount < 0
         let absValue: UInt64 = amount == Int64.min ? UInt64(Int64.max) + 1 : UInt64(abs(amount))
-        let raw = String(absValue)
+        let grouped = groupDigits(String(absValue))
+        return isNegative ? "-Rp\(grouped)" : "Rp\(grouped)"
+    }
+
+    /// Formats any integer with dot thousand separators (`2.000`, `1.000.000`).
+    static func groupedInteger(_ value: Int64) -> String {
+        let isNegative = value < 0
+        let absValue: UInt64 = value == Int64.min ? UInt64(Int64.max) + 1 : UInt64(abs(value))
+        let grouped = groupDigits(String(absValue))
+        return isNegative ? "-\(grouped)" : grouped
+    }
+
+    /// Live-formats raw user input digits with Indonesian dot separators (`1000000` -> `1.000.000`),
+    /// stripping non-digits and capping to 12 digits (`999.999.999.999`).
+    static func formatDigitsWithDots(_ raw: String, allowZero: Bool = false) -> String {
+        let digits = raw.filter(\.isNumber)
+        guard !digits.isEmpty else { return "" }
+        let strippedLeading = String(digits.drop(while: { $0 == "0" }))
+        if strippedLeading.isEmpty {
+            return allowZero ? "0" : ""
+        }
+        let capped = String(strippedLeading.prefix(12))
+        return groupDigits(capped)
+    }
+
+    static func greeting(for hour: Int) -> String {
+        switch hour {
+        case 4..<11: return "Selamat Pagi"
+        case 11..<15: return "Selamat Siang"
+        case 15..<19: return "Selamat Sore"
+        default: return "Selamat Malam"
+        }
+    }
+
+    private static func groupDigits(_ raw: String) -> String {
         var grouped = ""
         grouped.reserveCapacity(raw.count + raw.count / 3)
-
         let chars = Array(raw)
         for idx in chars.indices {
             if idx > 0 && (chars.count - idx) % 3 == 0 {
@@ -36,7 +69,7 @@ enum PLAFormatters {
             }
             grouped.append(chars[idx])
         }
-        return isNegative ? "-Rp\(grouped)" : "Rp\(grouped)"
+        return grouped
     }
 
     static func maskedRupiah() -> String {

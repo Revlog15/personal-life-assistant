@@ -31,32 +31,51 @@ struct SettingsView: View {
                         NotificationSettingsDetailView()
                             .environment(store)
                     } label: {
-                        Label("Pola Smart Reminder & Suara", systemImage: "bell.badge.fill")
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: "bell.badge.fill", color: PLATokens.Colors.coral, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Pola Smart Reminder & Suara")
+                        }
                     }
 
-                    Toggle("Ringkasan Pagi (07.30)", isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { store.settings.morningDigestEnabled },
                         set: { val in store.updateSettings { $0.morningDigestEnabled = val } }
-                    ))
+                    )) {
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: "sun.horizon.fill", color: PLATokens.Colors.warning, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Ringkasan Pagi (07.30)")
+                        }
+                    }
 
-                    Toggle("Jam Tenang (\(PLAFormatters.time24(store.settings.quietStartMinutes)) – \(PLAFormatters.time24(store.settings.quietEndMinutes)))", isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { store.settings.quietHoursEnabled },
                         set: { val in store.updateSettings { $0.quietHoursEnabled = val } }
-                    ))
+                    )) {
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: "moon.zzz.fill", color: PLATokens.Colors.indigo, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Jam Tenang (\(PLAFormatters.time24(store.settings.quietStartMinutes)) – \(PLAFormatters.time24(store.settings.quietEndMinutes)))")
+                        }
+                    }
 
                     NavigationLink {
                         FocusModeGuideView()
                     } label: {
-                        Label("Panduan Agar Tidak Terblokir Focus / DND", systemImage: "moon.fill")
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: "moon.fill", color: PLATokens.Colors.violet, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Panduan Agar Tidak Terblokir Focus / DND")
+                        }
                     }
 
                     NavigationLink {
                         SiriAndShortcutsGuideView()
                     } label: {
-                        Label("Siri Shortcuts & OCR Share Sheet", systemImage: "mic.badge.plus")
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: "mic.badge.plus", color: PLATokens.Colors.info, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Siri Shortcuts & OCR Share Sheet")
+                        }
                     }
 
-                    Toggle("Pertimbangkan Apple Calendar saat Reschedule", isOn: Binding(
+                    Toggle(isOn: Binding(
                         get: { store.settings.useCalendarForReschedule },
                         set: { enabled in
                             if enabled {
@@ -68,7 +87,12 @@ struct SettingsView: View {
                                 store.updateSettings { $0.useCalendarForReschedule = false }
                             }
                         }
-                    ))
+                    )) {
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: "calendar", color: PLATokens.Colors.rose, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Pertimbangkan Apple Calendar saat Reschedule")
+                        }
+                    }
 
                     if store.settings.preferredReminderMinutes != nil || !store.settings.extraEarlyReminderDaysByCategory.isEmpty {
                         Button("Reset Penyesuaian Personal Intelligence") {
@@ -103,19 +127,31 @@ struct SettingsView: View {
                     Button {
                         prepareJSONBackup()
                     } label: {
-                        Label("Backup Lengkap (JSON)", systemImage: "square.and.arrow.up.on.square")
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: "square.and.arrow.up.on.square.fill", color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Backup Lengkap (JSON)")
+                                .foregroundStyle(.primary)
+                        }
                     }
 
                     Button {
                         isImportingJSON = true
                     } label: {
-                        Label("Pulihkan Backup (JSON)", systemImage: "arrow.counterclockwise.circle")
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: "arrow.counterclockwise.circle.fill", color: PLATokens.Colors.safe, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Pulihkan Backup (JSON)")
+                                .foregroundStyle(.primary)
+                        }
                     }
 
                     Button {
                         showCSVRangeSheet = true
                     } label: {
-                        Label("Ekspor Transaksi (CSV)", systemImage: "tablecells")
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: "tablecells.fill", color: PLATokens.Colors.info, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Ekspor Transaksi (CSV)")
+                                .foregroundStyle(.primary)
+                        }
                     }
                 } header: {
                     Text("Data & Backup (iOS Files)")
@@ -129,13 +165,18 @@ struct SettingsView: View {
                         DiagnosticsView()
                             .environment(store)
                     } label: {
-                        Label("Diagnostik, Sideload & Kirim Masukan", systemImage: "stethoscope")
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: "stethoscope", color: PLATokens.Colors.warning, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Diagnostik, Sideload & Kirim Masukan")
+                        }
                     }
                 }
 
                 // 5. About & Sideload Expiry (AC-14.1)
                 aboutSection
             }
+            .scrollContentBackground(.hidden)
+            .background(PLATokens.Colors.canvas)
             .navigationTitle("Pengaturan")
             // JSON Backup FileExporter (AC-13.1)
             .fileExporter(
@@ -507,21 +548,24 @@ struct FocusModeGuideView: View {
 struct SiriAndShortcutsGuideView: View {
     var body: some View {
         Form {
-            Section("Siri & Action Button (App Intents)") {
-                Label("\"Hey Siri, Tambah tugas di Life Assistant\"", systemImage: "checklist")
+            Section {
+                Label("\"Hey Siri, Tambah tugas di Life Assistant\" (atau \"Add task in Life Assistant\")", systemImage: "checklist")
                 Label("\"Hey Siri, Catat pengeluaran di Life Assistant\"", systemImage: "banknote")
                 Label("\"Hey Siri, Scan struk di Life Assistant\"", systemImage: "doc.text.viewfinder")
+            } header: {
+                Text("Siri & Action Button (App Intents)")
+            } footer: {
+                Text("Siri akan memandu langkah demi langkah: kegiatan apa, dengan siapa/catatan, tanggal & jam, tingkat prioritas, dan kategori. Mendukung frasa Indonesia & Inggris.")
             }
 
             Section {
-                Label("1. Buka aplikasi Shortcuts di iPhone → ketuk '+' untuk Shortcut baru.", systemImage: "1.circle.fill")
-                Label("2. Ketuk ikon (i) di bawah → aktifkan 'Show in Share Sheet' → pilih tipe 'Images'.", systemImage: "2.circle.fill")
-                Label("3. Tambahkan aksi 'Scan Struk ke Life Assistant' dan hubungkan inputnya ke 'Shortcut Input'.", systemImage: "3.circle.fill")
-                Label("4. Dari bukti transfer BCA/Mandiri/GoPay/OVO/DANA, ketuk Share → pilih Shortcut Anda.", systemImage: "4.circle.fill")
+                Label("1. Dari screenshot bukti transfer BCA/Mandiri/GoPay/OVO/DANA atau Photos, ketuk Share → pilih 'Catat ke Life Assistant'.", systemImage: "1.circle.fill")
+                Label("2. Periksa hasil OCR offline lalu ketuk 'Simpan Draft & Buka Life Assistant'.", systemImage: "2.circle.fill")
+                Label("3. Alternatif 0-Extension (Shortcuts): buat Shortcut baru → aktifkan 'Show in Share Sheet' (Images) → tambahkan aksi 'Scan Struk ke Life Assistant'.", systemImage: "3.circle.fill")
             } header: {
-                Text("Pasang Shortcut Share Sheet OCR (0 App ID Tambahan)")
+                Text("Share Extension Native & Shortcut OCR")
             } footer: {
-                Text("Semua pemrosesan OCR memakai Apple Vision secara offline dan foto tidak pernah disimpan di aplikasi.")
+                Text("Semua pemrosesan OCR memakai Apple Vision secara offline di memori dan foto tidak pernah disimpan di aplikasi.")
             }
         }
         .navigationTitle("Siri & Shortcuts")
