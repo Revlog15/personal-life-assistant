@@ -72,7 +72,7 @@ public enum WhatIfSimulator {
         let verdict: WhatIfVerdict
         if afterExpense > budget || afterFree < 0 {
             verdict = .exceedsBudget
-        } else if afterPct >= 0.85 || (summary.isForecastReady && afterForecast > budget) {
+        } else if afterStatus == .warning || (summary.isForecastReady && afterForecast > budget) {
             verdict = .tightenDaily
         } else {
             verdict = .comfortable
