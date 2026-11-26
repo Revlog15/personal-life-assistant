@@ -142,6 +142,15 @@ jobs:
           done
           echo "App Group entitlements verified across PLAApp, PLAShareExtension, and PLAWidgetExtension."
 
+          # Verify CFBundleShortVersionString & CFBundleVersion inside Info.plist match apps.json
+          PLIST_VER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" build/Payload/PLAApp.app/Info.plist)
+          PLIST_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" build/Payload/PLAApp.app/Info.plist)
+          echo "Info.plist version=${PLIST_VER}, build=${PLIST_BUILD}"
+          if [ "${PLIST_VER}" != "${{ steps.meta.outputs.version }}" ] || [ "${PLIST_BUILD}" != "${{ steps.meta.outputs.build }}" ]; then
+            echo "ERROR: Info.plist version/build (${PLIST_VER}/${PLIST_BUILD}) does not match CI (${{ steps.meta.outputs.version }}/${{ steps.meta.outputs.build }})!"
+            exit 1
+          fi
+
           (cd build && zip -r -y PLAApp.ipa Payload)
           IPA_SIZE=$(stat -f%z build/PLAApp.ipa)
           echo "size=${IPA_SIZE}" >> "$GITHUB_OUTPUT"

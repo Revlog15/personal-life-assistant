@@ -36,6 +36,8 @@ targets:
       path: App/PLAApp/Info.plist
       properties:
         CFBundleDisplayName: Life Assistant
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: id
         CFBundleLocalizations:
           - id
@@ -92,6 +94,8 @@ targets:
       path: App/PLAShareExtension/Info.plist
       properties:
         CFBundleDisplayName: Catat ke Life Assistant
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: id
         NSExtension:
           NSExtensionPointIdentifier: com.apple.share-services
@@ -134,6 +138,8 @@ targets:
       path: App/PLAWidgetExtension/Info.plist
       properties:
         CFBundleDisplayName: Widget Life Assistant
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDevelopmentRegion: id
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
