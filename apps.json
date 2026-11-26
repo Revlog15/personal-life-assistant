@@ -19,6 +19,15 @@
       "screenshotURLs": [],
       "versions": [
         {
+          "version": "2.1.1",
+          "buildVersion": "15",
+          "date": "2026-11-26",
+          "localizedDescription": "fix(build): propagate MARKETING_VERSION and CURRENT_PROJECT_VERSION into Info.plist for all targets and verify in CI",
+          "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.1.1/PLAApp-2.1.1.ipa",
+          "size": 2983725,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "2.1.0",
           "buildVersion": "13",
           "date": "2026-11-26",
@@ -46,7 +55,7 @@
           "minOSVersion": "17.0"
         }
       ],
-      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.1.0/PLAApp-2.1.0.ipa"
+      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.1.1/PLAApp-2.1.1.ipa"
     }
   ],
   "news": []
