@@ -16,6 +16,9 @@ struct PLAApp: App {
         WindowGroup {
             RootTabView()
                 .environment(store)
+                .onOpenURL { url in
+                    store.handleIncomingURL(url)
+                }
                 .onChange(of: scenePhase) { _, newPhase in
                     store.authService.handleScenePhaseChange(newPhase, settings: store.settings)
                     switch newPhase {

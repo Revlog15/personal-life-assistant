@@ -80,7 +80,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.release_version }}" ]]; then
             VERSION="${{ inputs.release_version }}"
           else
-            VERSION="2.0.0"
+            VERSION="2.1.0"
           fi
           BUILD="${GITHUB_RUN_NUMBER}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -100,8 +100,7 @@ jobs:
             CURRENT_PROJECT_VERSION="${{ steps.meta.outputs.build }}" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS=""
+            CODE_SIGN_IDENTITY=""
 
       - name: Package Unsigned .ipa & Verify Bundle
         id: package
@@ -118,6 +117,30 @@ jobs:
             fi
           done
           echo "All 4 .caf notification sounds verified in bundle root."
+
+          # Verify P-06 Share Extension & P-07 WidgetKit Extension embedded in PlugIns/
+          for ext in PLAShareExtension.appex PLAWidgetExtension.appex; do
+            if [ ! -d "build/Payload/PLAApp.app/PlugIns/${ext}" ]; then
+              echo "ERROR: Missing app extension ${ext} in PLAApp.app/PlugIns!"
+              ls -la build/Payload/PLAApp.app/PlugIns/ || true
+              exit 1
+            fi
+          done
+          echo "Both P-06 (PLAShareExtension.appex) & P-07 (PLAWidgetExtension.appex) verified in PlugIns/."
+
+          # Embed App Group entitlements via ad-hoc codesign so SideStore/AltStore detects & remaps them cleanly (V-07)
+          codesign --force --sign "-" --entitlements App/PLAShareExtension/PLAShareExtension.entitlements --timestamp=none build/Payload/PLAApp.app/PlugIns/PLAShareExtension.appex
+          codesign --force --sign "-" --entitlements App/PLAWidgetExtension/PLAWidgetExtension.entitlements --timestamp=none build/Payload/PLAApp.app/PlugIns/PLAWidgetExtension.appex
+          codesign --force --sign "-" --entitlements App/PLAApp/PLAApp.entitlements --timestamp=none build/Payload/PLAApp.app
+
+          for bundle in build/Payload/PLAApp.app build/Payload/PLAApp.app/PlugIns/PLAShareExtension.appex build/Payload/PLAApp.app/PlugIns/PLAWidgetExtension.appex; do
+            echo "--- Entitlements check: ${bundle} ---"
+            codesign -d --entitlements - "${bundle}" 2>&1 | grep -q "group.id.revand.pla" || {
+              echo "ERROR: App Group entitlement missing in ${bundle}!"
+              exit 1
+            }
+          done
+          echo "App Group entitlements verified across PLAApp, PLAShareExtension, and PLAWidgetExtension."
 
           (cd build && zip -r -y PLAApp.ipa Payload)
           IPA_SIZE=$(stat -f%z build/PLAApp.ipa)
@@ -142,7 +165,7 @@ jobs:
           IPA_NAME="PLAApp-${{ steps.meta.outputs.version }}.ipa"
           cp build/PLAApp.ipa "build/${IPA_NAME}"
 
-          TAG_NOTES=$(git for-each-ref "refs/tags/${TAG}" --format='%(contents)' | tr '\n' ' ' | sed 's/  */ /g; s/^ //; s/ $//')
+          TAG_NOTES=$(git tag -l --format='%(contents)' "${TAG}" | tr '\n' ' ' | sed 's/  */ /g; s/^ //; s/ $//')
           if [ -z "${TAG_NOTES}" ]; then
             TAG_NOTES="Rilis Personal Life Assistant ${TAG} (build ${{ steps.meta.outputs.build }}, minimum iOS 17.0)."
           fi

@@ -16,7 +16,7 @@ def main() -> None:
     parser.add_argument("--min-os", default="17.0")
     parser.add_argument(
         "--notes",
-        default="Rilis Personal Life Assistant v2.0.0 (MVP + Pasca-MVP: NLP Quick Add Bahasa Indonesia, Siri/App Intents, Target Tabungan v2, Simulasi What-If, OCR Struk Offline Apple Vision, Smart Rescheduling EventKit, Personal Intelligence lokal, Pengingat Masa Trial).",
+        default="Rilis Personal Life Assistant v2.1.0 (Full PRD v0.2: MVP + Pasca-MVP lengkap termasuk Share Extension OCR native P-06, WidgetKit Home 2x2/4x2 & Lock Screen P-07, Diagnostik App Group V-07).",
     )
     args = parser.parse_args()
 

@@ -32,7 +32,10 @@ let package = Package(
                 "PLAData",
                 .product(name: "PLACore", package: "PLACore")
             ],
-            path: "Tests/PLADataTests"
+            path: "Tests/PLADataTests",
+            resources: [
+                .copy("Fixtures")
+            ]
         )
     ]
 )

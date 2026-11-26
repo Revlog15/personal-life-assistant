@@ -7,6 +7,8 @@ struct DiagnosticsView: View {
     @Environment(AppStore.self) private var store
     @State private var copiedConfirmation = false
     @State private var showSeedConfirm = false
+    @State private var appGroupProbeMessage: String?
+    @State private var appGroupProbePassed: Bool?
 
     var body: some View {
         Form {
@@ -39,6 +41,70 @@ struct DiagnosticsView: View {
                 Text("Masa Berlaku Sideload (SideStore)")
             } footer: {
                 Text("Jika embedded.mobileprovision tidak terbaca di perangkat, gunakan tombol di atas setelah refresh di SideStore untuk mengaktifkan pengingat H-2 & H-1.")
+            }
+
+            // 1b. App Group & Extension Health (PRD P-06, P-07 & V-07)
+            Section {
+                let ag = store.appGroupStatus
+                AdaptiveKeyValueRow {
+                    Text("App Group Aktif")
+                } trailing: {
+                    Text(ag.resolvedGroupId)
+                        .font(.caption.monospaced())
+                        .multilineTextAlignment(.trailing)
+                }
+
+                AdaptiveKeyValueRow {
+                    Text("Status Container (V-07)")
+                } trailing: {
+                    StatusBadge(
+                        text: ag.isContainerAccessible ? "Tersedia (\(ag.resolutionSource))" : "Fallback Lokal",
+                        icon: ag.isContainerAccessible ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                        color: ag.isContainerAccessible ? PLATokens.Colors.safe : PLATokens.Colors.warning
+                    )
+                }
+
+                AdaptiveKeyValueRow {
+                    Text("Sinkronisasi Widget Terakhir")
+                } trailing: {
+                    if let ts = ag.lastWidgetSyncAt {
+                        Text(ts.formatted(date: .abbreviated, time: .shortened))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Belum tersinkron")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Button {
+                    let res = store.runAppGroupSelfTest()
+                    appGroupProbePassed = res.ok
+                    appGroupProbeMessage = res.detail
+                } label: {
+                    Label("Uji Tulis/Baca App Group (Verifikasi V-07)", systemImage: "externaldrive.badge.checkmark")
+                }
+
+                Button {
+                    store.syncWidgetSnapshot()
+                    store.showToast("Snapshot WidgetKit disinkronkan ulang")
+                } label: {
+                    Label("Sinkronkan Ulang Widget Sekarang", systemImage: "rectangle.3.group")
+                }
+
+                if let msg = appGroupProbeMessage {
+                    Label(
+                        msg,
+                        systemImage: (appGroupProbePassed == true) ? "checkmark.seal.fill" : "exclamationmark.triangle.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle((appGroupProbePassed == true) ? PLATokens.Colors.safe : PLATokens.Colors.warning)
+                }
+            } header: {
+                Text("App Group, Share Extension & WidgetKit (V-07)")
+            } footer: {
+                Text("Jika App Group tidak tersedia di Apple ID gratis, Share Extension tetap mengirim hasil OCR lewat tautan pla:// dan Shortcut Share Sheet (P-05) tetap berfungsi penuh.")
             }
 
             // 2. Runtime Performance & Notification Queue Telemetry (SC-05, SC-06, SC-07, V-11)

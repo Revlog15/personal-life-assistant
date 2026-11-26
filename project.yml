@@ -21,9 +21,17 @@ targets:
       - path: App/PLAApp
         excludes:
           - "Info.plist"
+          - "PLAApp.entitlements"
+      - path: App/Shared
     dependencies:
       - package: PLACore
       - package: PLAData
+      - target: PLAShareExtension
+        embed: true
+        codeSign: false
+      - target: PLAWidgetExtension
+        embed: true
+        codeSign: false
     info:
       path: App/PLAApp/Info.plist
       properties:
@@ -42,6 +50,11 @@ targets:
           - fetch
         BGTaskSchedulerPermittedIdentifiers:
           - id.pla.refresh-notifications
+        CFBundleURLTypes:
+          - CFBundleTypeRole: Editor
+            CFBundleURLName: id.revand.pla
+            CFBundleURLSchemes:
+              - pla
         NSFaceIDUsageDescription: Personal Life Assistant menggunakan Face ID untuk melindungi halaman Keuangan agar saldo dan transaksi Anda tetap pribadi.
         NSCalendarsUsageDescription: Personal Life Assistant membaca jadwal kalender Anda (hanya-baca) untuk menyarankan hari paling longgar saat menjadwalkan ulang tugas.
         NSCalendarsFullAccessUsageDescription: Personal Life Assistant membaca jadwal kalender Anda (hanya-baca) untuk menyarankan hari paling longgar saat menjadwalkan ulang tugas.
@@ -50,15 +63,93 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: id.revand.pla
         PRODUCT_NAME: PLAApp
-        MARKETING_VERSION: "2.0.0"
+        MARKETING_VERSION: "2.1.0"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: App/PLAApp/PLAApp.entitlements
         SUPPORTS_MACCATALYST: NO
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        GENERATE_INFOPLIST_FILE: NO
+
+  PLAShareExtension:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: App/PLAShareExtension
+        excludes:
+          - "Info.plist"
+          - "PLAShareExtension.entitlements"
+      - path: App/Shared
+    dependencies:
+      - package: PLACore
+    info:
+      path: App/PLAShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Catat ke Life Assistant
+        CFBundleDevelopmentRegion: id
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsImageWithMaxCount: 1
+              NSExtensionActivationSupportsFileWithMaxCount: 1
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: id.revand.pla.share
+        PRODUCT_NAME: PLAShareExtension
+        MARKETING_VERSION: "2.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: App/PLAShareExtension/PLAShareExtension.entitlements
+        SUPPORTS_MACCATALYST: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        GENERATE_INFOPLIST_FILE: NO
+
+  PLAWidgetExtension:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: App/PLAWidgetExtension
+        excludes:
+          - "Info.plist"
+          - "PLAWidgetExtension.entitlements"
+      - path: App/Shared/PLASharedContainer.swift
+    dependencies:
+      - package: PLACore
+      - sdk: WidgetKit.framework
+      - sdk: SwiftUI.framework
+    info:
+      path: App/PLAWidgetExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Widget Life Assistant
+        CFBundleDevelopmentRegion: id
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: id.revand.pla.widget
+        PRODUCT_NAME: PLAWidgetExtension
+        MARKETING_VERSION: "2.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        TARGETED_DEVICE_FAMILY: "1"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_ENTITLEMENTS: App/PLAWidgetExtension/PLAWidgetExtension.entitlements
+        SUPPORTS_MACCATALYST: NO
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         GENERATE_INFOPLIST_FILE: NO
 
@@ -67,6 +158,8 @@ schemes:
     build:
       targets:
         PLAApp: all
+        PLAShareExtension: all
+        PLAWidgetExtension: all
     run:
       config: Debug
     archive:

@@ -109,4 +109,64 @@ final class MigrationV1ToV3Tests: XCTestCase {
         XCTAssertEqual(fetchedTrial?.isTrial, true)
         XCTAssertEqual(fetchedTrial?.trialEndDateLocal, LocalDate(year: 2026, month: 12, day: 10))
     }
+
+    /// Verifies PRD §11.5: committed anonymous static v1_initial_mvp `.sqlite` binary fixture in `Tests/PLADataTests/Fixtures/`
+    /// upgrades cleanly to v3 with automatic pre-migration backup, exact row counts, and exact multi-account balances.
+    func testCommittedStaticV1SQLiteFixtureMigratesCleanlyToV3() throws {
+        guard let fixtureURL = Bundle.module.url(
+            forResource: "pla_v1_initial_mvp",
+            withExtension: "sqlite",
+            subdirectory: "Fixtures"
+        ) else {
+            return XCTFail("Missing committed fixture Fixtures/pla_v1_initial_mvp.sqlite in test bundle")
+        }
+
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("pla-static-v1-fixture-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let workingDB = tempDir.appendingPathComponent("pla.sqlite")
+        try FileManager.default.copyItem(at: fixtureURL, to: workingDB)
+
+        let upgraded = try DatabaseManager(inMemory: false, pathURL: workingDB, appVersion: "2.1.0")
+        let store = GRDBStore(dbManager: upgraded)
+
+        let files = try FileManager.default.contentsOfDirectory(atPath: tempDir.path)
+        XCTAssertTrue(
+            files.contains { $0.hasPrefix("pla_backup_before_v") && $0.hasSuffix(".sqlite") },
+            "Expected pre-migration backup from static v1 fixture in \(files)"
+        )
+
+        let accounts = try store.fetchAllAccounts()
+        let transactions = try store.fetchAllTransactions()
+        let tasks = try store.fetchAllTasks()
+        let bills = try store.fetchAllBills()
+        let budgets = try store.fetchAllBudgets()
+        let insights = try store.fetchAllInsights()
+
+        XCTAssertEqual(accounts.count, 2)
+        XCTAssertEqual(transactions.count, 3)
+        XCTAssertEqual(tasks.count, 2)
+        XCTAssertEqual(bills.count, 1)
+        XCTAssertEqual(budgets.count, 1)
+        XCTAssertEqual(insights.count, 1)
+
+        // Bank Utama: 2,000,000 + 5,000,000 - 500,000 = 6,500,000
+        // E-Wallet:     500,000 +   500,000 - 150,000 =   850,000
+        // Total = 7,350,000 (transfer must not inflate or deflate total liquid wealth)
+        let balances = AccountBalanceCalculator.balancesByAccount(accounts: accounts, transactions: transactions)
+        let bankId = UUID(uuidString: "22222222-2222-4222-8222-222222222201")!
+        let ewalletId = UUID(uuidString: "22222222-2222-4222-8222-222222222202")!
+        XCTAssertEqual(balances[bankId], 6_500_000)
+        XCTAssertEqual(balances[ewalletId], 850_000)
+        XCTAssertEqual(AccountBalanceCalculator.totalLiquidWealth(accounts: accounts, transactions: transactions), 7_350_000)
+
+        // Verify schemaVersion updated to 3 and v2/v3 tables operational
+        let schemaVersion: String? = try upgraded.dbWriter.read { db in
+            try String.fetchOne(db, sql: "SELECT value FROM app_metadata WHERE key = 'schemaVersion'")
+        }
+        XCTAssertEqual(schemaVersion, "3")
+        XCTAssertEqual(try store.fetchAllSavingsGoals().count, 0)
+    }
 }

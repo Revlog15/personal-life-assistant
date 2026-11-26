@@ -1,6 +1,7 @@
 import Foundation
 import SwiftUI
 import UserNotifications
+import WidgetKit
 import PLACore
 import PLAData
 
@@ -36,7 +37,10 @@ final class AppStore {
     var sideloadInfo: SideloadExpiryInfo
     var databaseErrorMessage: String?
     var pendingOCRReceipt: PendingOCRReceiptDraft?
+    var pendingTabNavigation: AppTab?
+    var pendingQuickAddRoute: QuickAddSheetKind?
     var dismissedPersonalSuggestionIds: Set<String> = []
+    private var lastHandledOCRDraftId: UUID?
 
     // Toast & 5-second Undo state (AC-02.3)
     var toastMessage: String?
@@ -248,13 +252,71 @@ final class AppStore {
             bills = try store.fetchAllBills()
             insightRecords = try store.fetchAllInsights()
             savingsGoals = try store.fetchAllSavingsGoals()
+            syncWidgetSnapshot()
         } catch {
             diagnostics.log(level: "ERROR", category: "Reload", message: "Gagal memuat data: \(error.localizedDescription)")
         }
     }
 
+    func syncWidgetSnapshot() {
+        let snapshot = WidgetSnapshotBuilder.build(
+            today: today,
+            now: currentDateTime,
+            summary: financialSummary,
+            tasks: tasks,
+            bills: bills,
+            settings: settings,
+            generatedAt: clock.now
+        )
+        let saved = PLASharedContainer.saveWidgetSnapshot(snapshot)
+        if saved {
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
+
+    var appGroupStatus: PLAAppGroupStatus {
+        PLASharedContainer.status()
+    }
+
+    func runAppGroupSelfTest() -> (ok: Bool, detail: String) {
+        let result = PLASharedContainer.runAppGroupSelfTest()
+        diagnostics.log(
+            level: result.ok ? "INFO" : "WARN",
+            category: "AppGroupV07",
+            message: result.detail
+        )
+        return result
+    }
+
     func consumePendingOCRReceiptIfAny() {
-        if let draft = PendingOCRReceiptStore.consume() {
+        if let draft = PendingOCRReceiptStore.consume(), draft.id != lastHandledOCRDraftId {
+            lastHandledOCRDraftId = draft.id
+            pendingOCRReceipt = draft
+        }
+    }
+
+    func handleIncomingURL(_ url: URL) {
+        guard let route = PLAURLRoute.parse(url: url) else { return }
+        switch route {
+        case .dashboard:
+            pendingTabNavigation = .dashboard
+        case .tasks:
+            pendingTabNavigation = .tasks
+        case .finance:
+            pendingTabNavigation = .finance
+        case .settings:
+            pendingTabNavigation = .settings
+        case .quickAddTask:
+            pendingTabNavigation = .tasks
+            pendingQuickAddRoute = .task
+        case .quickAddExpense:
+            pendingTabNavigation = .finance
+            pendingQuickAddRoute = .expense
+        case .ocrDraft(let draft):
+            guard draft.id != lastHandledOCRDraftId else { return }
+            lastHandledOCRDraftId = draft.id
+            // Clear any duplicate App Group file saved simultaneously by Share Extension
+            _ = PendingOCRReceiptStore.consume()
             pendingOCRReceipt = draft
         }
     }
@@ -826,6 +888,7 @@ final class AppStore {
         if !settings.financeLockEnabled {
             authService.isFinanceUnlocked = true
         }
+        syncWidgetSnapshot()
         _Concurrency.Task { await syncNotificationQueueNow() }
     }
 

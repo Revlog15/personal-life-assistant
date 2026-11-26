@@ -91,7 +91,8 @@ final class DiagnosticsService {
     func buildSanitizedBundle(
         pendingNotifications: Int,
         sideloadStatusText: String,
-        databaseReady: Bool
+        databaseReady: Bool,
+        appGroupSummary: String = PLASharedContainer.status().summaryText
     ) -> String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
@@ -112,6 +113,7 @@ final class DiagnosticsService {
             "Versi App: \(version) (Build \(build))",
             "Perangkat: \(device.model) | iOS \(device.systemVersion)",
             "Database: \(databaseReady ? "OK" : "ERROR")",
+            "App Group (V-07): \(appGroupSummary)",
             "Cold Start Terakhir: \(coldStartText)",
             "Pending Notifikasi: \(pendingNotifications) / 64",
             "Soak Drift Notifikasi: \(drift.count) sampel (\(String(format: "%.1f", drift.withinOneMinutePct))% dalam ±60 dtk)",

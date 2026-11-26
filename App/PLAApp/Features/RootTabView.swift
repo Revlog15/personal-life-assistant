@@ -117,6 +117,18 @@ struct RootTabView: View {
             ReceiptOCRReviewSheet(initialDraft: draft)
                 .environment(store)
         }
+        .onChange(of: store.pendingTabNavigation) { _, tab in
+            if let tab {
+                selectedTab = tab
+                store.pendingTabNavigation = nil
+            }
+        }
+        .onChange(of: store.pendingQuickAddRoute) { _, route in
+            if let route {
+                activeQuickAdd = route
+                store.pendingQuickAddRoute = nil
+            }
+        }
     }
 
     private var privacyOverlay: some View {
