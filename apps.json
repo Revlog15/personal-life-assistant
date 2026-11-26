@@ -22,7 +22,7 @@
           "version": "2.0.0",
           "buildVersion": "11",
           "date": "2026-11-26",
-          "localizedDescription": "fix(PLAApp): pass compile-time string literal 'public.image' to ScanReceiptIntent parameter",
+          "localizedDescription": "Rilis Personal Life Assistant v2.0.0 (Pasca-MVP Fase 5–7): NLP Quick Add Bahasa Indonesia, Siri & App Intents, Target Tabungan v2, Simulasi What-If, OCR Struk Offline (Apple Vision), Smart Rescheduling EventKit, Personal Intelligence lokal, Pengulangan dari Tanggal Selesai, dan Pengingat Masa Trial (0 App Extensions, 100% offline).",
           "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.0.0/PLAApp-2.0.0.ipa",
           "size": 2158418,
           "minOSVersion": "17.0"
