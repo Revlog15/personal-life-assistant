@@ -22,7 +22,7 @@
           "version": "2.1.0",
           "buildVersion": "13",
           "date": "2026-11-26",
-          "localizedDescription": "feat: implement P-06 Share Extension, P-07 WidgetKit, V-07 App Group probe, static v1 SQLite fixture, and QA docs",
+          "localizedDescription": "Rilis Personal Life Assistant v2.1.0 (Full PRD v0.2): Share Extension OCR native (P-06), WidgetKit Home Screen 2×2/4×2 & Lock Screen (P-07), resolusi App Group dinamis SideStore + probe Diagnostik V-07, fixture SQLite v1 statis, serta panduan instalasi & QA lengkap (100% offline). Pilih 'Keep App Extensions' (3 App ID) di SideStore untuk fitur penuh, atau 'Remove App Extensions' (1 App ID) untuk fallback Shortcut P-05.",
           "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.1.0/PLAApp-2.1.0.ipa",
           "size": 2983608,
           "minOSVersion": "17.0"
