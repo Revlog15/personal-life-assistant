@@ -80,7 +80,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.release_version }}" ]]; then
             VERSION="${{ inputs.release_version }}"
           else
-            VERSION="1.0.0"
+            VERSION="2.0.0"
           fi
           BUILD="${GITHUB_RUN_NUMBER}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
@@ -142,12 +142,17 @@ jobs:
           IPA_NAME="PLAApp-${{ steps.meta.outputs.version }}.ipa"
           cp build/PLAApp.ipa "build/${IPA_NAME}"
 
+          TAG_NOTES=$(git for-each-ref "refs/tags/${TAG}" --format='%(contents)' | tr '\n' ' ' | sed 's/  */ /g; s/^ //; s/ $//')
+          if [ -z "${TAG_NOTES}" ]; then
+            TAG_NOTES="Rilis Personal Life Assistant ${TAG} (build ${{ steps.meta.outputs.build }}, minimum iOS 17.0)."
+          fi
+
           if gh release view "${TAG}" >/dev/null 2>&1; then
             gh release upload "${TAG}" "build/${IPA_NAME}" --clobber
           else
             gh release create "${TAG}" "build/${IPA_NAME}" \
               --title "Personal Life Assistant ${TAG}" \
-              --notes "Rilis unsigned IPA untuk SideStore (build ${{ steps.meta.outputs.build }}, minimum iOS 17.0). Lihat docs/INSTALL_TESTER.md untuk panduan instalasi."
+              --notes "${TAG_NOTES} — Unsigned IPA untuk SideStore (build ${{ steps.meta.outputs.build }}, minimum iOS 17.0). Lihat docs/INSTALL_TESTER.md untuk panduan instalasi."
           fi
 
           DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/${IPA_NAME}"
@@ -157,7 +162,8 @@ jobs:
             --build "${{ steps.meta.outputs.build }}" \
             --download-url "${DOWNLOAD_URL}" \
             --size "${{ steps.package.outputs.size }}" \
-            --min-os "17.0"
+            --min-os "17.0" \
+            --notes "${TAG_NOTES}"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -10,7 +10,7 @@ final class CalendarService {
     var authorizationStatus: EKAuthorizationStatus = EKEventStore.authorizationStatus(for: .event)
 
     var isAuthorizedForRead: Bool {
-        authorizationStatus == .fullAccess || authorizationStatus == .authorized
+        authorizationStatus == .fullAccess
     }
 
     func refreshStatus() {
