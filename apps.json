@@ -19,6 +19,15 @@
       "screenshotURLs": [],
       "versions": [
         {
+          "version": "2.3.1",
+          "buildVersion": "21",
+          "date": "2026-11-27",
+          "localizedDescription": "refactor(v2.3.1): distill UI hierarchy across all tabs, flat grouped surfaces, 4-tab Liquid Glass Finance & Dompet, persistent tab state, and 44pt touch targets",
+          "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.3.1/PLAApp-2.3.1.ipa",
+          "size": 3164875,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "2.3.0",
           "buildVersion": "19",
           "date": "2026-11-27",
@@ -73,7 +82,7 @@
           "minOSVersion": "17.0"
         }
       ],
-      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.3.0/PLAApp-2.3.0.ipa"
+      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.3.1/PLAApp-2.3.1.ipa"
     }
   ],
   "news": []
