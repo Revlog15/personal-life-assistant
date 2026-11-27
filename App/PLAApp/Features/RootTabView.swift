@@ -38,26 +38,36 @@ struct RootTabView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            Group {
-                switch selectedTab {
-                case .dashboard:
-                    DashboardView(
-                        selectedTab: $selectedTab,
-                        onQuickAdd: { activeQuickAdd = $0 }
-                    )
-                case .tasks:
-                    TasksView()
-                case .finance:
-                    FinanceGateView()
-                case .settings:
-                    SettingsView()
-                }
+            // Keep all 4 tab hierarchies mounted so scroll offset, search filters, segments, and calendar dates persist across tab switches.
+            ZStack {
+                DashboardView(
+                    selectedTab: $selectedTab,
+                    onQuickAdd: { activeQuickAdd = $0 }
+                )
+                .opacity(selectedTab == .dashboard ? 1 : 0)
+                .allowsHitTesting(selectedTab == .dashboard)
+                .accessibilityHidden(selectedTab != .dashboard)
+
+                TasksView()
+                    .opacity(selectedTab == .tasks ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .tasks)
+                    .accessibilityHidden(selectedTab != .tasks)
+
+                FinanceGateView(isActive: selectedTab == .finance)
+                    .opacity(selectedTab == .finance ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .finance)
+                    .accessibilityHidden(selectedTab != .finance)
+
+                SettingsView()
+                    .opacity(selectedTab == .settings ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .settings)
+                    .accessibilityHidden(selectedTab != .settings)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(PLATokens.Colors.canvas.ignoresSafeArea())
             .tint(PLATokens.Colors.accent)
 
-            // Detached Floating Liquid Glass Bottom Dock (stays behind keyboard when typing)
+            // Detached Floating Liquid Glass Bottom Dock (stays anchored behind keyboard while typing)
             VStack(spacing: PLATokens.Spacing.sm) {
                 if let message = store.toastMessage {
                     ToastBannerView(

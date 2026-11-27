@@ -1,7 +1,7 @@
 import SwiftUI
 import PLACore
 
-// MARK: - Core Layout & Surface Containers
+// MARK: - Core Flat Content Surfaces & Layout Primitives
 
 /// Adapts between horizontal side-by-side and vertical stacking automatically for Dynamic Type up to AX3 (PRD §13.2).
 struct AdaptiveKeyValueRow<Leading: View, Trailing: View>: View {
@@ -28,12 +28,14 @@ struct AdaptiveKeyValueRow<Leading: View, Trailing: View>: View {
     }
 }
 
-/// Crisp solid content card (pure white in Light Mode, deep slate in Dark Mode) with a clean hairline border.
-/// Stays flat on the canvas so elevation is reserved exclusively for floating chrome.
+/// Calm flat content surface (pure white on soft porcelain canvas in Light Mode; deep slate with hairline rim in Dark Mode).
+/// Never nests inside another card; relies on clean canvas contrast rather than noisy borders.
 struct PLACard<Content: View>: View {
     var padding: CGFloat = PLATokens.Spacing.lg
     var cornerRadius: CGFloat = PLATokens.Radius.lg
     private let content: Content
+
+    @Environment(\.colorScheme) private var colorScheme
 
     init(
         padding: CGFloat = PLATokens.Spacing.lg,
@@ -53,32 +55,68 @@ struct PLACard<Content: View>: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .fill(PLATokens.Colors.surface)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(PLATokens.Colors.border, lineWidth: 1)
-            )
+            .overlay {
+                if colorScheme == .dark {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(PLATokens.Colors.hairline, lineWidth: 0.75)
+                }
+            }
     }
 }
 
-/// Architectural section header with bold title and optional trailing action button.
+/// Single clean surface grouping related list rows with subtle inset hairlines (eliminates border-per-row card noise).
+struct PLAGroupList<Content: View>: View {
+    private let content: Content
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            content
+        }
+        .padding(.horizontal, PLATokens.Spacing.lg)
+        .padding(.vertical, PLATokens.Spacing.xs)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: PLATokens.Radius.lg, style: .continuous)
+                .fill(PLATokens.Colors.surface)
+        )
+        .overlay {
+            if colorScheme == .dark {
+                RoundedRectangle(cornerRadius: PLATokens.Radius.lg, style: .continuous)
+                    .stroke(PLATokens.Colors.hairline, lineWidth: 0.75)
+            }
+        }
+    }
+}
+
+/// Delicate 0.5pt inset separator between grouped rows inside `PLAGroupList`.
+struct PLAInsetDivider: View {
+    var leadingInset: CGFloat = 0
+
+    var body: some View {
+        Rectangle()
+            .fill(PLATokens.Colors.hairline)
+            .frame(height: 0.75)
+            .padding(.leading, leadingInset)
+    }
+}
+
+/// Clean section heading without eyebrows or kickers; optional trailing action meets 44pt tap height.
 struct PLASectionHeader: View {
     let title: String
-    var subtitle: String? = nil
     var actionTitle: String? = nil
     var action: (() -> Void)? = nil
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(PLATokens.Colors.textPrimary)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                }
-            }
+        HStack(alignment: .center) {
+            Text(title)
+                .font(.headline.weight(.bold))
+                .foregroundStyle(PLATokens.Colors.textPrimary)
             Spacer(minLength: PLATokens.Spacing.sm)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
@@ -90,13 +128,67 @@ struct PLASectionHeader: View {
     }
 }
 
+/// Consistent top screen header shared across all 4 tabs (single bold title, zero eyebrow clutter, optional trailing controls).
+struct PLAScreenHeader<Trailing: View>: View {
+    let title: String
+    private let trailing: Trailing
+
+    init(_ title: String, @ViewBuilder trailing: () -> Trailing = { EmptyView() }) {
+        self.title = title
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: PLATokens.Spacing.sm) {
+            Text(title)
+                .font(.title.weight(.bold))
+                .foregroundStyle(PLATokens.Colors.textPrimary)
+            Spacer(minLength: PLATokens.Spacing.sm)
+            trailing
+        }
+        .padding(.top, PLATokens.Spacing.xs)
+    }
+}
+
+// MARK: - Liquid Glass Chrome (Floating Dock, Translucent Segment Capsule & Header Pill Controls)
+
+/// Reusable Liquid Glass capsule background modifier (iOS 17+ native `.ultraThinMaterial` + specular white rim).
+private struct PLALiquidGlassChrome: ViewModifier {
+    var elevated: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content
+            .background(.ultraThinMaterial, in: Capsule())
+            .background(PLATokens.Colors.glassTint, in: Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(colorScheme == .dark ? 0.28 : 0.92),
+                                Color.white.opacity(colorScheme == .dark ? 0.06 : 0.22)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(
+                color: elevated ? Color.black.opacity(colorScheme == .dark ? 0.42 : 0.12) : .clear,
+                radius: elevated ? 18 : 0,
+                x: 0,
+                y: elevated ? 8 : 0
+            )
+    }
+}
+
 /// Compact circular Liquid Glass action button for top bar controls (44x44pt minimum touch target).
 struct PLALiquidGlassIconButton: View {
     let systemImage: String
     let accessibilityLabel: String
     let action: () -> Void
-
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: action) {
@@ -104,25 +196,53 @@ struct PLALiquidGlassIconButton: View {
                 .font(.body.weight(.semibold))
                 .foregroundStyle(PLATokens.Colors.textPrimary)
                 .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
-                .background(.ultraThinMaterial, in: Circle())
-                .background(PLATokens.Colors.glassTint, in: Circle())
-                .overlay(
-                    Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(colorScheme == .dark ? 0.28 : 0.90),
-                                    Color.white.opacity(colorScheme == .dark ? 0.06 : 0.25)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1
-                        )
-                )
+                .modifier(PLALiquidGlassChrome(elevated: false))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+/// Full-width translucent Liquid Glass segmented capsule for <=4 equal options (fits 1 screen with zero horizontal scrolling).
+struct PLAGlassSegmentBar<Option: Hashable & Identifiable>: View {
+    let options: [Option]
+    @Binding var selection: Option
+    let title: (Option) -> String
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(options) { option in
+                let active = selection == option
+                Button {
+                    if reduceMotion {
+                        selection = option
+                    } else {
+                        withAnimation(.spring(response: 0.24, dampingFraction: 0.85)) {
+                            selection = option
+                        }
+                    }
+                } label: {
+                    Text(title(option))
+                        .font(.caption.weight(active ? .bold : .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .foregroundStyle(active ? Color.white : PLATokens.Colors.textPrimary)
+                        .frame(maxWidth: .infinity, minHeight: 38)
+                        .background {
+                            if active {
+                                Capsule()
+                                    .fill(PLATokens.Colors.primaryBlue)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(active ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .modifier(PLALiquidGlassChrome(elevated: false))
     }
 }
 
@@ -156,14 +276,10 @@ struct PLAPrimaryPillButton: View {
     }
 }
 
-// MARK: - Detached Floating Liquid Glass Bottom Dock
-
-/// Floating Liquid Glass pill navigation dock hovering above the bottom safe area (inspired by reference dock).
-/// Uses native iOS 17 `.ultraThinMaterial` + specular hairline rim so it works seamlessly on iOS 17+ Light & Dark modes.
+/// Detached floating Liquid Glass bottom dock with clear labeled icons on all 4 destinations (`>= 48pt` tap targets).
 struct PLAFloatingGlassTabBar: View {
     @Binding var selectedTab: AppTab
 
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private struct TabItem: Identifiable {
@@ -177,37 +293,32 @@ struct PLAFloatingGlassTabBar: View {
     private let items: [TabItem] = [
         TabItem(tab: .dashboard, title: "Beranda", icon: "house", activeIcon: "house.fill"),
         TabItem(tab: .tasks, title: "Tugas", icon: "checklist", activeIcon: "checklist"),
-        TabItem(tab: .finance, title: "Keuangan", icon: "chart.bar", activeIcon: "chart.bar.fill"),
-        TabItem(tab: .settings, title: "Pengaturan", icon: "gearshape", activeIcon: "gearshape.fill")
+        TabItem(tab: .finance, title: "Keuangan", icon: "wallet.pass", activeIcon: "wallet.pass.fill"),
+        TabItem(tab: .settings, title: "Setelan", icon: "gearshape", activeIcon: "gearshape.fill")
     ]
 
     var body: some View {
-        HStack(spacing: PLATokens.Spacing.sm) {
+        HStack(spacing: 4) {
             ForEach(items) { item in
                 let isSelected = selectedTab == item.tab
                 Button {
                     if reduceMotion {
                         selectedTab = item.tab
                     } else {
-                        withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                        withAnimation(.spring(response: 0.26, dampingFraction: 0.84)) {
                             selectedTab = item.tab
                         }
                     }
                 } label: {
-                    HStack(spacing: 6) {
+                    VStack(spacing: 3) {
                         Image(systemName: isSelected ? item.activeIcon : item.icon)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(isSelected ? Color.white : PLATokens.Colors.glassInactiveIcon)
-
-                        if isSelected {
-                            Text(item.title)
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(Color.white)
-                                .lineLimit(1)
-                        }
+                            .font(.system(size: 17, weight: .semibold))
+                        Text(item.title)
+                            .font(.system(size: 10, weight: isSelected ? .bold : .medium))
+                            .lineLimit(1)
                     }
-                    .padding(.horizontal, isSelected ? 16 : 0)
-                    .frame(minWidth: 48, minHeight: 48)
+                    .foregroundStyle(isSelected ? Color.white : PLATokens.Colors.glassInactiveIcon)
+                    .frame(maxWidth: .infinity, minHeight: 50)
                     .background {
                         if isSelected {
                             Capsule()
@@ -216,34 +327,13 @@ struct PLAFloatingGlassTabBar: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(item.title)
+                .accessibilityLabel(item.title == "Setelan" ? "Pengaturan" : item.title)
                 .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .background(.ultraThinMaterial, in: Capsule())
-        .background(PLATokens.Colors.glassTint, in: Capsule())
-        .overlay(
-            Capsule()
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.30 : 0.92),
-                            Color.white.opacity(colorScheme == .dark ? 0.08 : 0.22)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .shadow(
-            color: Color.black.opacity(colorScheme == .dark ? 0.45 : 0.14),
-            radius: 18,
-            x: 0,
-            y: 8
-        )
+        .padding(.horizontal, 6)
+        .padding(.vertical, 6)
+        .modifier(PLALiquidGlassChrome(elevated: true))
         .padding(.horizontal, PLATokens.Spacing.lg)
         .padding(.bottom, PLATokens.Spacing.sm)
     }
@@ -266,8 +356,7 @@ enum SpendingChartRange: Int, CaseIterable, Identifiable {
     }
 }
 
-/// High-contrast obsidian telemetry card with timeframe pills, smooth blue trend curve, and bottom tick ruler.
-/// Driven exclusively by real local transaction totals; displays an honest flat baseline when no expenses exist.
+/// High-contrast obsidian telemetry card with timeframe pills, smooth blue trend curve, tick ruler, and optional compact footer metrics.
 struct PLAChartHeroCard: View {
     let title: String
     let subtitle: String
@@ -276,6 +365,10 @@ struct PLAChartHeroCard: View {
     @Binding var selectedRange: SpendingChartRange
     var status: BudgetHealthStatus? = nil
     var showStatusBadge: Bool = true
+    var footerLeftLabel: String? = nil
+    var footerLeftValue: String? = nil
+    var footerRightLabel: String? = nil
+    var footerRightValue: String? = nil
     var isMasked: Bool = false
     var onUnlock: (() -> Void)? = nil
 
@@ -295,7 +388,7 @@ struct PLAChartHeroCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
-            // Header row: question title + status pill
+            // Header row
             HStack(alignment: .top, spacing: PLATokens.Spacing.sm) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
@@ -307,8 +400,7 @@ struct PLAChartHeroCard: View {
                             .monospacedDigit()
                             .foregroundStyle(Color.white)
                     } else if let idx = inspectedIndex, points.indices.contains(idx) {
-                        let pt = points[idx]
-                        Text(PLAFormatters.rupiah(pt.amount))
+                        Text(PLAFormatters.rupiah(points[idx].amount))
                             .font(.system(.title2, design: .rounded).weight(.bold))
                             .monospacedDigit()
                             .foregroundStyle(Color.white)
@@ -330,8 +422,8 @@ struct PLAChartHeroCard: View {
                         Label("Buka", systemImage: "faceid")
                             .font(.caption.weight(.bold))
                             .foregroundStyle(PLATokens.Colors.obsidianCard)
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 36)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: PLATokens.minTouchTarget)
                             .background(Color.white, in: Capsule())
                     }
                     .buttonStyle(.plain)
@@ -346,7 +438,7 @@ struct PLAChartHeroCard: View {
                 }
             }
 
-            // Segmented timeframe selector pills (active pill crisp white with dark text)
+            // Segmented timeframe selector pills
             HStack(spacing: PLATokens.Spacing.xs) {
                 ForEach(SpendingChartRange.allCases) { range in
                     let active = selectedRange == range
@@ -371,7 +463,7 @@ struct PLAChartHeroCard: View {
             .padding(3)
             .background(Color.white.opacity(0.08), in: Capsule())
 
-            // Chart body
+            // Plot body
             if isMasked {
                 lockedPlaceholder
             } else if !hasAnyData {
@@ -380,9 +472,40 @@ struct PLAChartHeroCard: View {
                 smoothCurvePlot
             }
 
-            // Bottom tick ruler + day labels
+            // Bottom tick ruler
             if !isMasked && !points.isEmpty {
                 tickRuler
+            }
+
+            // Optional integrated compact 2-column summary strip (avoids redundant cards underneath)
+            if !isMasked, let leftLabel = footerLeftLabel, let leftValue = footerLeftValue {
+                Rectangle()
+                    .fill(Color.white.opacity(0.10))
+                    .frame(height: 0.75)
+
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(leftLabel)
+                            .font(.caption2)
+                            .foregroundStyle(PLATokens.Colors.obsidianMutedText)
+                        Text(leftValue)
+                            .font(.subheadline.weight(.bold))
+                            .monospacedDigit()
+                            .foregroundStyle(Color.white)
+                    }
+                    Spacer(minLength: PLATokens.Spacing.sm)
+                    if let rightLabel = footerRightLabel, let rightValue = footerRightValue {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(rightLabel)
+                                .font(.caption2)
+                                .foregroundStyle(PLATokens.Colors.obsidianMutedText)
+                            Text(rightValue)
+                                .font(.subheadline.weight(.bold))
+                                .monospacedDigit()
+                                .foregroundStyle(PLATokens.Colors.chartLine)
+                        }
+                    }
+                }
             }
         }
         .padding(PLATokens.Spacing.lg)
@@ -416,7 +539,7 @@ struct PLAChartHeroCard: View {
                 .font(.caption)
                 .foregroundStyle(PLATokens.Colors.obsidianMutedText)
         }
-        .frame(maxWidth: .infinity, minHeight: 84, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
     }
 
     private var emptyChartPlaceholder: some View {
@@ -424,12 +547,12 @@ struct PLAChartHeroCard: View {
             Rectangle()
                 .fill(PLATokens.Colors.chartLine.opacity(0.35))
                 .frame(height: 2)
-                .padding(.top, 26)
+                .padding(.top, 22)
             Text("Belum ada pengeluaran tercatat pada rentang \(selectedRange.label.lowercased()).")
                 .font(.caption)
                 .foregroundStyle(PLATokens.Colors.obsidianMutedText)
         }
-        .frame(maxWidth: .infinity, minHeight: 84, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
     }
 
     private var smoothCurvePlot: some View {
@@ -462,14 +585,12 @@ struct PLAChartHeroCard: View {
 
                 if let idx = activeIndex, coords.indices.contains(idx) {
                     let pt = coords[idx]
-                    // Vertical guide hair
                     Path { p in
                         p.move(to: CGPoint(x: pt.x, y: pt.y))
                         p.addLine(to: CGPoint(x: pt.x, y: h))
                     }
                     .stroke(PLATokens.Colors.chartLine.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
 
-                    // Active highlight dot (single focal glow accent on chart node)
                     Circle()
                         .fill(PLATokens.Colors.chartLine.opacity(0.28))
                         .frame(width: 22, height: 22)
@@ -496,7 +617,7 @@ struct PLAChartHeroCard: View {
                     }
             )
         }
-        .frame(height: 112)
+        .frame(height: 104)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title), total \(PLAFormatters.rupiah(totalAmount))")
     }
@@ -508,7 +629,7 @@ struct PLAChartHeroCard: View {
                 ForEach(0..<25, id: \.self) { tick in
                     Rectangle()
                         .fill(tick % 6 == 0 ? Color.white.opacity(0.55) : Color.white.opacity(0.20))
-                        .frame(width: 1, height: tick % 6 == 0 ? 10 : 5)
+                        .frame(width: 1, height: tick % 6 == 0 ? 9 : 4)
                     if tick < 24 {
                         Spacer(minLength: 0)
                     }
@@ -592,9 +713,9 @@ struct PLAChartHeroCard: View {
     }
 }
 
-// MARK: - Reference-Inspired Rings, Week Strip Calendar, Metric Tiles & Breakdown Bars
+// MARK: - Reference-Inspired Rings, Flat Week Strip Calendar & Breakdown Bars
 
-/// Single day column with circular completion ring and weekday letter (modeled on reference overview rings).
+/// Single day column with circular completion ring and weekday letter.
 struct PLAMiniRingDayColumn: View {
     let point: PLADailyRingPoint
 
@@ -602,7 +723,7 @@ struct PLAMiniRingDayColumn: View {
         VStack(spacing: 6) {
             ZStack {
                 Circle()
-                    .stroke(PLATokens.Colors.border, lineWidth: 3)
+                    .stroke(PLATokens.Colors.hairline, lineWidth: 3)
                 if point.totalCount > 0 {
                     Circle()
                         .trim(from: 0, to: min(max(point.progress, 0.08), 1))
@@ -635,7 +756,8 @@ struct PLAMiniRingDayColumn: View {
     }
 }
 
-/// Interactive 7-day horizontal calendar strip with soft-blue vertical active day capsule.
+/// Borderless, flat 7-day horizontal calendar strip sitting directly on the canvas (matching the reference `Daily Goals` layout).
+/// All interactive buttons meet 44x44pt minimum touch target.
 struct PLAWeekStripCalendar: View {
     @Binding var selectedDate: LocalDate
     let today: LocalDate
@@ -648,145 +770,93 @@ struct PLAWeekStripCalendar: View {
     }
 
     var body: some View {
-        PLACard(padding: PLATokens.Spacing.md) {
-            VStack(spacing: PLATokens.Spacing.md) {
-                HStack {
-                    Text(PLAFormatters.monthYear(selectedDate))
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(PLATokens.Colors.textPrimary)
+        VStack(spacing: PLATokens.Spacing.sm) {
+            HStack(spacing: PLATokens.Spacing.xs) {
+                Text(PLAFormatters.monthYear(selectedDate))
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(PLATokens.Colors.textPrimary)
 
-                    Spacer()
+                Spacer()
 
-                    if selectedDate != today {
-                        Button("Hari Ini") {
-                            selectedDate = today
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(PLATokens.Colors.accent)
-                        .padding(.horizontal, 10)
-                        .frame(minHeight: 32)
-                        .background(PLATokens.Colors.softBlueTint, in: Capsule())
-                        .buttonStyle(.plain)
+                if selectedDate != today {
+                    Button("Hari Ini") {
+                        selectedDate = today
                     }
-
-                    HStack(spacing: 4) {
-                        Button {
-                            selectedDate = selectedDate.addingDays(-7)
-                        } label: {
-                            Image(systemName: "chevron.left")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(PLATokens.Colors.textSecondary)
-                                .frame(width: 36, height: 36)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Minggu sebelumnya")
-
-                        Button {
-                            selectedDate = selectedDate.addingDays(7)
-                        } label: {
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(PLATokens.Colors.textSecondary)
-                                .frame(width: 36, height: 36)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Minggu berikutnya")
-                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(PLATokens.Colors.accent)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: PLATokens.minTouchTarget)
+                    .buttonStyle(.plain)
                 }
 
-                HStack(spacing: 4) {
-                    ForEach(weekDates, id: \.self) { date in
-                        let isSelected = date == selectedDate
-                        let isToday = date == today
-                        let hasTasks = activeTaskDates.contains(date)
+                Button {
+                    selectedDate = selectedDate.addingDays(-7)
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(PLATokens.Colors.textSecondary)
+                        .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Minggu sebelumnya")
 
-                        Button {
-                            selectedDate = date
-                        } label: {
-                            VStack(spacing: 5) {
-                                Text(PLAFormatters.singleLetterWeekday(date.weekdayISO))
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(
-                                        isSelected
-                                        ? PLATokens.Colors.softBlueText
-                                        : PLATokens.Colors.textSecondary
-                                    )
+                Button {
+                    selectedDate = selectedDate.addingDays(7)
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(PLATokens.Colors.textSecondary)
+                        .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Minggu berikutnya")
+            }
 
-                                Text(date.day < 10 ? "0\(date.day)" : "\(date.day)")
-                                    .font(.subheadline.weight(isSelected || isToday ? .bold : .medium))
-                                    .monospacedDigit()
-                                    .foregroundStyle(
-                                        isSelected
-                                        ? PLATokens.Colors.softBlueText
-                                        : PLATokens.Colors.textPrimary
-                                    )
+            HStack(spacing: 4) {
+                ForEach(weekDates, id: \.self) { date in
+                    let isSelected = date == selectedDate
+                    let isToday = date == today
+                    let hasTasks = activeTaskDates.contains(date)
 
-                                Circle()
-                                    .fill(hasTasks ? PLATokens.Colors.accent : Color.clear)
-                                    .frame(width: 5, height: 5)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 62)
-                            .background {
-                                if isSelected {
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .fill(PLATokens.Colors.softBlueTint)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                                .stroke(PLATokens.Colors.accent.opacity(0.35), lineWidth: 1)
-                                        )
-                                }
+                    Button {
+                        selectedDate = date
+                    } label: {
+                        VStack(spacing: 6) {
+                            Text(PLAFormatters.singleLetterWeekday(date.weekdayISO))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(
+                                    isSelected
+                                    ? PLATokens.Colors.softBlueText
+                                    : PLATokens.Colors.textSecondary
+                                )
+
+                            Text(date.day < 10 ? "0\(date.day)" : "\(date.day)")
+                                .font(.subheadline.weight(isSelected || isToday ? .bold : .medium))
+                                .monospacedDigit()
+                                .foregroundStyle(
+                                    isSelected
+                                    ? PLATokens.Colors.softBlueText
+                                    : PLATokens.Colors.textPrimary
+                                )
+
+                            Circle()
+                                .fill(hasTasks ? PLATokens.Colors.accent : Color.clear)
+                                .frame(width: 5, height: 5)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 62)
+                        .background {
+                            if isSelected {
+                                Capsule()
+                                    .fill(PLATokens.Colors.softBlueTint)
                             }
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("\(PLAFormatters.fullDate(date))\(hasTasks ? ", ada tugas aktif" : "")")
-                        .accessibilityAddTraits(isSelected ? .isSelected : [])
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(PLAFormatters.fullDate(date))\(hasTasks ? ", ada tugas aktif" : "")")
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
             }
         }
-    }
-}
-
-/// Clean 2x2 stat tile (label top-left, subtle icon top-right, tabular metric below).
-struct PLAMetricTile: View {
-    let title: String
-    let value: String
-    var subtitle: String? = nil
-    let systemImage: String
-    var valueColor: Color = PLATokens.Colors.textPrimary
-    var iconTint: Color = PLATokens.Colors.accent
-
-    var body: some View {
-        PLACard(padding: PLATokens.Spacing.md, cornerRadius: 18) {
-            VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-                HStack(alignment: .top) {
-                    Text(title)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                        .lineLimit(2)
-                    Spacer(minLength: 4)
-                    Image(systemName: systemImage)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(iconTint)
-                        .accessibilityHidden(true)
-                }
-
-                Text(value)
-                    .font(.system(.headline, design: .rounded).weight(.bold))
-                    .monospacedDigit()
-                    .foregroundStyle(valueColor)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-
-                if let subtitle {
-                    Text(subtitle)
-                        .font(.caption2)
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                        .lineLimit(1)
-                }
-            }
-        }
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -822,7 +892,7 @@ struct PLABreakdownBarRow: View {
                 let clamped = min(max(progress, 0), 1)
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(PLATokens.Colors.border.opacity(0.85))
+                        .fill(PLATokens.Colors.hairline)
                     Capsule()
                         .fill(barColor)
                         .frame(width: max(clamped > 0 ? 8 : 0, geo.size.width * clamped))
@@ -835,7 +905,7 @@ struct PLABreakdownBarRow: View {
 
 // MARK: - Preserved & Harmonized Shared Components
 
-/// Tinted SF Symbol badge for structured rows and forms.
+/// Tinted SF Symbol badge for structured forms and compact headers.
 struct PLAIconBadge: View {
     let systemName: String
     let color: Color
@@ -855,7 +925,7 @@ struct PLAIconBadge: View {
     }
 }
 
-/// Deep Cobalt-Blue hero container used on Onboarding and Accounts/Savings summary headers.
+/// Deep Cobalt-Blue hero container used on Onboarding and Dompet total liquidity summary.
 struct PLAHeroCard<Content: View>: View {
     var gradient: LinearGradient = PLATokens.heroGradient
     private let content: Content
@@ -976,7 +1046,7 @@ struct PLAEmptyStateView: View {
     var body: some View {
         PLACard(padding: PLATokens.Spacing.xl) {
             VStack(spacing: PLATokens.Spacing.md) {
-                PLAIconBadge(systemName: systemImage, color: tint, size: 48, iconFont: .title3.weight(.semibold))
+                PLAIconBadge(systemName: systemImage, color: tint, size: 46, iconFont: .title3.weight(.semibold))
                 Text(title)
                     .font(.headline.weight(.bold))
                     .foregroundStyle(PLATokens.Colors.textPrimary)
@@ -995,7 +1065,7 @@ struct PLAEmptyStateView: View {
     }
 }
 
-/// Insight card with severity icon, deterministic Indonesian copy, thumbs feedback (SC-16), and dismiss (AC-11.4).
+/// Insight row with severity icon, deterministic Indonesian copy, thumbs feedback (SC-16), and dismiss (AC-11.4).
 struct InsightCardView: View {
     let insight: FinancialInsight
     let currentFeedback: Int?
@@ -1011,7 +1081,7 @@ struct InsightCardView: View {
                 PLAIconBadge(
                     systemName: PLATokens.icon(for: insight.severity),
                     color: color,
-                    size: 36,
+                    size: 34,
                     iconFont: .subheadline.weight(.semibold)
                 )
 
@@ -1027,7 +1097,7 @@ struct InsightCardView: View {
             }
             .accessibilityElement(children: .combine)
 
-            HStack(spacing: PLATokens.Spacing.sm) {
+            HStack(spacing: PLATokens.Spacing.xs) {
                 Text("Berguna?")
                     .font(.caption)
                     .foregroundStyle(PLATokens.Colors.textSecondary)
@@ -1060,6 +1130,7 @@ struct InsightCardView: View {
                     .frame(minWidth: PLATokens.minTouchTarget, minHeight: PLATokens.minTouchTarget)
             }
         }
+        .padding(.vertical, PLATokens.Spacing.sm)
     }
 }
 
@@ -1068,8 +1139,6 @@ struct ToastBannerView: View {
     let message: String
     let undoTitle: String?
     let onUndo: (() -> Void)?
-
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: PLATokens.Spacing.md) {
@@ -1095,21 +1164,12 @@ struct ToastBannerView: View {
         }
         .padding(.horizontal, PLATokens.Spacing.lg)
         .padding(.vertical, PLATokens.Spacing.sm)
-        .background(.ultraThinMaterial, in: Capsule())
-        .background(PLATokens.Colors.glassTint, in: Capsule())
-        .overlay(
-            Capsule()
-                .stroke(
-                    Color.white.opacity(colorScheme == .dark ? 0.22 : 0.85),
-                    lineWidth: 1
-                )
-        )
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.35 : 0.12), radius: 12, x: 0, y: 6)
+        .modifier(PLALiquidGlassChrome(elevated: true))
         .padding(.horizontal, PLATokens.Spacing.lg)
     }
 }
 
-/// Alert banner for sideload expiry (AC-14.2), denied notifications (AC-05.4), or database recovery.
+/// Alert row for sideload expiry (AC-14.2), denied notifications (AC-05.4), or database recovery.
 struct AlertBannerRow: View {
     let icon: String
     let tint: Color
@@ -1121,7 +1181,7 @@ struct AlertBannerRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             HStack(alignment: .top, spacing: PLATokens.Spacing.md) {
-                PLAIconBadge(systemName: icon, color: tint, size: 36)
+                PLAIconBadge(systemName: icon, color: tint, size: 34)
                 VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                     Text(title)
                         .font(.subheadline.weight(.semibold))
@@ -1141,10 +1201,11 @@ struct AlertBannerRow: View {
                     .frame(minHeight: PLATokens.minTouchTarget)
             }
         }
+        .padding(.vertical, PLATokens.Spacing.sm)
     }
 }
 
-/// P-09: Personal Intelligence opt-in suggestion card (R-PER-01 & R-PER-02).
+/// P-09: Personal Intelligence opt-in suggestion row (R-PER-01 & R-PER-02).
 struct PersonalSuggestionRow: View {
     let suggestion: PersonalSuggestion
     let onAccept: () -> Void
@@ -1153,7 +1214,7 @@ struct PersonalSuggestionRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             HStack(alignment: .top, spacing: PLATokens.Spacing.md) {
-                PLAIconBadge(systemName: iconName, color: PLATokens.Colors.accent, size: 36)
+                PLAIconBadge(systemName: iconName, color: PLATokens.Colors.accent, size: 34)
                 VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                     Text(titleText)
                         .font(.subheadline.weight(.semibold))
@@ -1178,6 +1239,7 @@ struct PersonalSuggestionRow: View {
                     .frame(minHeight: PLATokens.minTouchTarget)
             }
         }
+        .padding(.vertical, PLATokens.Spacing.sm)
     }
 
     private var iconName: String {

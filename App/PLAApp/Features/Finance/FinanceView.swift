@@ -5,9 +5,7 @@ enum FinanceSegment: Int, CaseIterable, Identifiable {
     case summary = 0
     case transactions = 1
     case bills = 2
-    case accounts = 3
-    case budgets = 4
-    case savings = 5
+    case wallet = 3
 
     var id: Int { rawValue }
     var title: String {
@@ -15,20 +13,19 @@ enum FinanceSegment: Int, CaseIterable, Identifiable {
         case .summary: return "Ringkasan"
         case .transactions: return "Transaksi"
         case .bills: return "Tagihan"
-        case .accounts: return "Akun"
-        case .budgets: return "Anggaran"
-        case .savings: return "Tabungan"
+        case .wallet: return "Dompet"
         }
     }
 }
 
-/// Finance tab (PRD §7.2, F-07..F-11, P-03, P-04): White & Blue ScrollView architecture with obsidian chart hero,
-/// 2x2 real-metric grid, horizontal category/budget/savings breakdown bars, and full offline management.
+/// Finance tab (PRD §7.2, F-07..F-11, P-03, P-04): 4 full-width Liquid Glass tabs (Ringkasan, Transaksi, Tagihan, Dompet),
+/// distilled hierarchy without redundant cards, and flat grouped rows with hairline separators.
 struct FinanceView: View {
     @Environment(AppStore.self) private var store
 
     @State private var segment: FinanceSegment = .summary
     @State private var chartRange: SpendingChartRange = .cycle
+    @State private var showCategoryBudgets = false
 
     // Transaction filters (AC-08.4)
     @State private var txTypeFilter: TransactionType? = nil
@@ -59,36 +56,31 @@ struct FinanceView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                headerBar
-                    .padding(.horizontal, PLATokens.Spacing.lg)
-                    .padding(.top, PLATokens.Spacing.sm)
-                    .padding(.bottom, PLATokens.Spacing.sm)
-
-                segmentBar
-                    .padding(.bottom, PLATokens.Spacing.sm)
-
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: PLATokens.Spacing.lg) {
-                        switch segment {
-                        case .summary:
-                            summaryContent
-                        case .transactions:
-                            transactionsContent
-                        case .bills:
-                            billsContent
-                        case .accounts:
-                            accountsContent
-                        case .budgets:
-                            budgetsContent
-                        case .savings:
-                            savingsContent
-                        }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: PLATokens.Spacing.section) {
+                    VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
+                        headerBar
+                        PLAGlassSegmentBar(
+                            options: FinanceSegment.allCases,
+                            selection: $segment,
+                            title: \.title
+                        )
                     }
-                    .padding(.horizontal, PLATokens.Spacing.lg)
-                    .padding(.top, PLATokens.Spacing.xs)
-                    .padding(.bottom, PLATokens.floatingDockClearance)
+
+                    switch segment {
+                    case .summary:
+                        summaryContent
+                    case .transactions:
+                        transactionsContent
+                    case .bills:
+                        billsContent
+                    case .wallet:
+                        walletContent
+                    }
                 }
+                .padding(.horizontal, PLATokens.Spacing.lg)
+                .padding(.top, PLATokens.Spacing.sm)
+                .padding(.bottom, PLATokens.floatingDockClearance)
             }
             .background(PLATokens.Colors.canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
@@ -162,96 +154,62 @@ struct FinanceView: View {
         }
     }
 
-    // MARK: - Top Header & Segment Switcher
+    // MARK: - Top Header
 
     private var headerBar: some View {
-        HStack(spacing: PLATokens.Spacing.sm) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(PLAFormatters.periodRange(store.activePeriod))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(PLATokens.Colors.textSecondary)
-                Text("Keuangan")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(PLATokens.Colors.textPrimary)
-            }
-
-            Spacer()
-
-            if store.settings.financeLockEnabled {
-                PLALiquidGlassIconButton(
-                    systemImage: "lock.fill",
-                    accessibilityLabel: "Kunci halaman Keuangan"
-                ) {
-                    store.authService.lockImmediately()
-                }
-            }
-
-            Menu {
-                Button { showAddExpense = true } label: {
-                    Label("Catat Pengeluaran", systemImage: "arrow.up.right.circle")
-                }
-                Button { showAddIncome = true } label: {
-                    Label("Catat Pemasukan", systemImage: "arrow.down.left.circle")
-                }
-                Button { showTransfer = true } label: {
-                    Label("Transfer Antar Akun", systemImage: "arrow.left.arrow.right.circle")
-                }
-                Button { showOCRScanSheet = true } label: {
-                    Label("Scan Struk / Transfer (OCR)", systemImage: "doc.text.viewfinder")
-                }
-                Divider()
-                Button { showWhatIfSheet = true } label: {
-                    Label("Simulasi Beli (What-If)", systemImage: "slider.horizontal.below.square.filled.and.square")
-                }
-                Button { showAddSavingsGoal = true } label: {
-                    Label("Tambah Target Tabungan", systemImage: "target")
-                }
-                Button { showAddBill = true } label: {
-                    Label("Tambah Tagihan / Trial", systemImage: "calendar.badge.exclamationmark")
-                }
-                Button { showAddAccount = true } label: {
-                    Label("Tambah Akun/Dompet", systemImage: "creditcard")
-                }
-            } label: {
-                Image(systemName: "plus")
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(Color.white)
-                    .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
-                    .background(PLATokens.Colors.primaryBlue, in: Circle())
-            }
-            .accessibilityLabel("Tambah catatan keuangan")
-        }
-    }
-
-    private var segmentBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        PLAScreenHeader("Keuangan") {
             HStack(spacing: PLATokens.Spacing.sm) {
-                ForEach(FinanceSegment.allCases) { item in
-                    let active = segment == item
-                    Button(item.title) {
-                        segment = item
+                if store.settings.financeLockEnabled {
+                    PLALiquidGlassIconButton(
+                        systemImage: "lock.fill",
+                        accessibilityLabel: "Kunci halaman Keuangan"
+                    ) {
+                        store.authService.lockImmediately()
                     }
-                    .font(.subheadline.weight(active ? .bold : .medium))
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 38)
-                    .background(
-                        Capsule()
-                            .fill(active ? PLATokens.Colors.primaryBlue : PLATokens.Colors.surface)
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(active ? Color.clear : PLATokens.Colors.border, lineWidth: 1)
-                    )
-                    .foregroundStyle(active ? Color.white : PLATokens.Colors.textPrimary)
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(active ? .isSelected : [])
                 }
+
+                Menu {
+                    Section("Catat") {
+                        Button { showAddExpense = true } label: {
+                            Label("Pengeluaran", systemImage: "arrow.up.right.circle")
+                        }
+                        Button { showAddIncome = true } label: {
+                            Label("Pemasukan", systemImage: "arrow.down.left.circle")
+                        }
+                        Button { showTransfer = true } label: {
+                            Label("Transfer Antar Akun", systemImage: "arrow.left.arrow.right.circle")
+                        }
+                        Button { showOCRScanSheet = true } label: {
+                            Label("Scan Struk (OCR)", systemImage: "doc.text.viewfinder")
+                        }
+                    }
+                    Section("Kelola") {
+                        Button { showWhatIfSheet = true } label: {
+                            Label("Simulasi Beli (What-If)", systemImage: "slider.horizontal.3")
+                        }
+                        Button { showAddBill = true } label: {
+                            Label("Tagihan / Trial Baru", systemImage: "calendar.badge.exclamationmark")
+                        }
+                        Button { showAddAccount = true } label: {
+                            Label("Akun / Dompet Baru", systemImage: "creditcard")
+                        }
+                        Button { showAddSavingsGoal = true } label: {
+                            Label("Target Tabungan Baru", systemImage: "target")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(Color.white)
+                        .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
+                        .background(PLATokens.Colors.primaryBlue, in: Circle())
+                }
+                .accessibilityLabel("Tambah catatan keuangan")
             }
-            .padding(.horizontal, PLATokens.Spacing.lg)
         }
     }
 
-    // MARK: - 1. Ringkasan (F-11)
+    // MARK: - 1. Ringkasan (Distilled to 3 Calm Blocks: Hero Chart + Budget/Forecast + Top Categories)
 
     @ViewBuilder
     private var summaryContent: some View {
@@ -265,99 +223,26 @@ struct FinanceView: View {
         }()
         let rangeTotal = points.reduce(Int64(0)) { $0 + $1.amount }
 
-        // 1a. Obsidian Telemetry Chart Hero
+        // Block 1: Obsidian Spending Trend Hero (integrates Pemasukan & Arus Kas cleanly)
         PLAChartHeroCard(
             title: "Tren Pengeluaran",
-            subtitle: "Hari ke-\(s.period.currentDay) dari \(s.period.totalDays), ketuk titik untuk rincian",
+            subtitle: "\(PLAFormatters.periodRange(s.period)) • Hari \(s.period.currentDay)/\(s.period.totalDays)",
             totalAmount: chartRange == .cycle ? s.totalExpense : rangeTotal,
             points: points,
             selectedRange: $chartRange,
-            status: s.budgetStatus
+            status: s.budgetStatus,
+            footerLeftLabel: "Pemasukan",
+            footerLeftValue: PLAFormatters.compactRupiah(s.totalIncome),
+            footerRightLabel: "Arus Kas Bersih",
+            footerRightValue: PLAFormatters.compactRupiah(s.netCashFlow)
         )
 
-        // 1b. Cash Flow Strip Card
-        PLACard(padding: PLATokens.Spacing.lg) {
-            VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
-                AdaptiveKeyValueRow {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Arus Kas Bersih")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(PLATokens.Colors.textSecondary)
-                        MoneyText(
-                            amount: s.netCashFlow,
-                            style: .title3.weight(.bold),
-                            color: s.netCashFlow < 0 ? PLATokens.Colors.danger : PLATokens.Colors.textPrimary
-                        )
-                    }
-                } trailing: {
-                    StatusBadge(
-                        text: PLATokens.label(for: s.budgetStatus),
-                        icon: PLATokens.icon(for: s.budgetStatus),
-                        color: PLATokens.color(for: s.budgetStatus)
-                    )
-                }
+        // Block 2: Unified Budget, Safe Daily Limit, Forecast & Collapsible Category Budgets
+        budgetAndForecastCard(s)
 
-                Divider()
-
-                HStack(spacing: PLATokens.Spacing.lg) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label("Pemasukan", systemImage: "arrow.down.left")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(PLATokens.Colors.safe)
-                        MoneyText(amount: s.totalIncome, style: .subheadline.weight(.bold))
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Label("Pengeluaran", systemImage: "arrow.up.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(PLATokens.Colors.danger)
-                        MoneyText(amount: s.totalExpense, style: .subheadline.weight(.bold))
-                    }
-                }
-            }
-        }
-
-        // 1c. Quick Tools Row: Scan OCR + Simulasi Beli
-        HStack(spacing: PLATokens.Spacing.sm) {
-            Button {
-                showOCRScanSheet = true
-            } label: {
-                PLACard(padding: PLATokens.Spacing.md, cornerRadius: 16) {
-                    HStack(spacing: PLATokens.Spacing.sm) {
-                        PLAIconBadge(systemName: "doc.text.viewfinder", color: PLATokens.Colors.accent, size: 34)
-                        Text("Scan Struk OCR")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(PLATokens.Colors.textPrimary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                showWhatIfSheet = true
-            } label: {
-                PLACard(padding: PLATokens.Spacing.md, cornerRadius: 16) {
-                    HStack(spacing: PLATokens.Spacing.sm) {
-                        PLAIconBadge(systemName: "slider.horizontal.3", color: PLATokens.Colors.accent, size: 34)
-                        Text("Simulasi Beli")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(PLATokens.Colors.textPrimary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                    }
-                }
-            }
-            .buttonStyle(.plain)
-        }
-
-        // 1d. Budget & Forecast 2x2 Metrics + Progress Card
-        summaryBudgetAndForecastBlock(s)
-
-        // 1e. Top 3 Expense Categories (Macro-Style Horizontal Breakdown Bars)
+        // Block 3: Top 3 Categories (Macro-style horizontal breakdown bars)
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-            PLASectionHeader(title: "Top 3 Kategori Pengeluaran")
+            PLASectionHeader(title: "Kategori Terbesar")
             PLACard(padding: PLATokens.Spacing.lg) {
                 if s.expenseTransactionCount < 3 {
                     Text("Catat minimal 3 pengeluaran untuk melihat kategori terbesar.")
@@ -374,7 +259,7 @@ struct FinanceView: View {
                             PLABreakdownBarRow(
                                 title: cat.categoryName,
                                 valueText: PLAFormatters.rupiah(cat.totalSpent),
-                                subtitle: "\(pctInt)% dari pengeluaran variabel",
+                                subtitle: "\(pctInt)% dari belanja harian",
                                 progress: cat.percentageOfVariable,
                                 barColor: PLATokens.Colors.primaryBlue
                             )
@@ -384,19 +269,20 @@ struct FinanceView: View {
             }
         }
 
-        // 1f. Local Financial Insights
+        // Optional Insights (shown only when triggered)
         if !store.activeInsights.isEmpty {
             VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-                PLASectionHeader(title: "Peringatan & Saran Lokal")
-                VStack(spacing: PLATokens.Spacing.sm) {
-                    ForEach(store.activeInsights) { insight in
-                        PLACard(padding: PLATokens.Spacing.md) {
-                            InsightCardView(
-                                insight: insight,
-                                currentFeedback: store.feedbackForInsight(insight),
-                                onFeedback: { useful in store.rateInsight(insight, useful: useful) },
-                                onDismiss: { store.dismissInsight(insight) }
-                            )
+                PLASectionHeader(title: "Insight Keuangan")
+                PLAGroupList {
+                    ForEach(Array(store.activeInsights.enumerated()), id: \.element.id) { idx, insight in
+                        InsightCardView(
+                            insight: insight,
+                            currentFeedback: store.feedbackForInsight(insight),
+                            onFeedback: { useful in store.rateInsight(insight, useful: useful) },
+                            onDismiss: { store.dismissInsight(insight) }
+                        )
+                        if idx < store.activeInsights.count - 1 {
+                            PLAInsetDivider()
                         }
                     }
                 }
@@ -404,90 +290,120 @@ struct FinanceView: View {
         }
     }
 
-    @ViewBuilder
-    private func summaryBudgetAndForecastBlock(_ s: FinancialPeriodSummary) -> some View {
-        let columns = [
-            GridItem(.flexible(), spacing: PLATokens.Spacing.md),
-            GridItem(.flexible(), spacing: PLATokens.Spacing.md)
-        ]
-
+    private func budgetAndForecastCard(_ s: FinancialPeriodSummary) -> some View {
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             PLASectionHeader(
-                title: "Anggaran & Proyeksi",
+                title: "Anggaran Bulanan",
                 actionTitle: s.totalBudget == nil ? "Atur" : "Ubah",
                 action: { showTotalBudgetSheet = true }
             )
 
-            if let totalBudget = s.totalBudget, let pct = s.percentUsed {
-                PLACard(padding: PLATokens.Spacing.lg) {
-                    PLABreakdownBarRow(
-                        title: "Anggaran Bulanan (\(Int((pct * 100).rounded()))%)",
-                        valueText: PLAFormatters.rupiah(s.totalExpense),
-                        subtitle: "Batas \(PLAFormatters.rupiah(totalBudget))",
-                        progress: pct,
-                        barColor: PLATokens.color(for: s.budgetStatus)
-                    )
-                }
+            PLACard(padding: PLATokens.Spacing.lg) {
+                VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
+                    if let totalBudget = s.totalBudget, let pct = s.percentUsed {
+                        PLABreakdownBarRow(
+                            title: "Terpakai \(Int((pct * 100).rounded()))%",
+                            valueText: PLAFormatters.rupiah(s.totalExpense),
+                            subtitle: "Batas \(PLAFormatters.rupiah(totalBudget))",
+                            progress: pct,
+                            barColor: PLATokens.color(for: s.budgetStatus)
+                        )
 
-                LazyVGrid(columns: columns, spacing: PLATokens.Spacing.md) {
-                    PLAMetricTile(
-                        title: "Sisa Anggaran",
-                        value: PLAFormatters.compactRupiah(s.remainingBudget ?? 0),
-                        subtitle: s.unpaidBillsDue > 0 ? "Bebas: \(PLAFormatters.compactRupiah(s.freeRemainingBudget ?? 0))" : "Periode aktif",
-                        systemImage: "banknote",
-                        valueColor: (s.remainingBudget ?? 0) < 0 ? PLATokens.Colors.danger : PLATokens.Colors.textPrimary
-                    )
+                        PLAInsetDivider()
 
-                    PLAMetricTile(
-                        title: "Batas Aman/Hari",
-                        value: PLAFormatters.compactRupiah(s.safeDailyLimit ?? 0),
-                        subtitle: "\(s.period.remainingDaysInclusive) hari tersisa",
-                        systemImage: "shield.checkered",
-                        valueColor: PLATokens.Colors.accent
-                    )
-
-                    PLAMetricTile(
-                        title: "Proyeksi Akhir",
-                        value: s.isForecastReady ? PLAFormatters.compactRupiah(s.forecastTotal) : "Menunggu data",
-                        subtitle: s.isForecastReady
-                            ? "Rata-rata \(PLAFormatters.compactRupiah(Int64(s.averageDailyVariableExpense.rounded())))/hr"
-                            : "Butuh 5 hari & 5 trx",
-                        systemImage: "chart.line.uptrend.xyaxis",
-                        valueColor: (s.isForecastReady && s.forecastTotal > totalBudget) ? PLATokens.Colors.danger : PLATokens.Colors.textPrimary
-                    )
-
-                    PLAMetricTile(
-                        title: "Cadangan Tagihan",
-                        value: PLAFormatters.compactRupiah(s.unpaidBillsDue),
-                        subtitle: s.unpaidBillsDue > 0 ? "Belum lunas siklus ini" : "Semua tagihan lunas",
-                        systemImage: "calendar.badge.clock",
-                        valueColor: s.unpaidBillsDue > 0 ? PLATokens.Colors.warning : PLATokens.Colors.safe,
-                        iconTint: s.unpaidBillsDue > 0 ? PLATokens.Colors.warning : PLATokens.Colors.safe
-                    )
-                }
-            } else {
-                PLACard(padding: PLATokens.Spacing.lg) {
-                    VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
-                        Text("Anggaran bulanan belum diatur. Tetapkan batas total untuk melihat sisa harian aman dan proyeksi akhir periode.")
+                        summaryLine(
+                            label: "Sisa Anggaran",
+                            value: PLAFormatters.rupiah(s.remainingBudget ?? 0),
+                            valueColor: (s.remainingBudget ?? 0) < 0 ? PLATokens.Colors.danger : PLATokens.Colors.textPrimary
+                        )
+                        summaryLine(
+                            label: "Batas Aman/Hari (\(s.period.remainingDaysInclusive) hari)",
+                            value: PLAFormatters.rupiah(s.safeDailyLimit ?? 0),
+                            valueColor: PLATokens.Colors.accent
+                        )
+                        if s.unpaidBillsDue > 0 {
+                            summaryLine(
+                                label: "Tagihan Belum Lunas",
+                                value: PLAFormatters.rupiah(s.unpaidBillsDue),
+                                valueColor: PLATokens.Colors.warning
+                            )
+                        }
+                        if s.isForecastReady {
+                            summaryLine(
+                                label: "Proyeksi Akhir Periode",
+                                value: PLAFormatters.rupiah(s.forecastTotal),
+                                valueColor: s.forecastTotal > totalBudget ? PLATokens.Colors.danger : PLATokens.Colors.textPrimary
+                            )
+                        } else {
+                            Text("Proyeksi aktif setelah minimal 5 hari dan 5 pengeluaran (saat ini: hari ke-\(s.period.currentDay), \(s.expenseTransactionCount) transaksi).")
+                                .font(.caption)
+                                .foregroundStyle(PLATokens.Colors.textSecondary)
+                        }
+                    } else {
+                        Text("Tetapkan batas anggaran bulanan untuk menghitung batas aman harian dan proyeksi belanja.")
                             .font(.subheadline)
                             .foregroundStyle(PLATokens.Colors.textSecondary)
                         PLAPrimaryPillButton(title: "Atur Anggaran Bulanan") {
                             showTotalBudgetSheet = true
                         }
                     }
-                }
-            }
 
-            if !s.isForecastReady {
-                PLACard(padding: PLATokens.Spacing.md) {
-                    Label(
-                        "Butuh minimal 5 hari dan 5 transaksi pengeluaran untuk proyeksi bulanan (saat ini: hari ke-\(s.period.currentDay), \(s.expenseTransactionCount) transaksi).",
-                        systemImage: "info.circle"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(PLATokens.Colors.textSecondary)
+                    PLAInsetDivider()
+
+                    // Collapsible Category Budgets (keeps F-09 100% accessible without a 5th tab)
+                    DisclosureGroup(isExpanded: $showCategoryBudgets) {
+                        VStack(spacing: PLATokens.Spacing.md) {
+                            ForEach(store.expenseCategories) { cat in
+                                let catSum = s.categorySummaries.first { $0.id == cat.id }
+                                Button {
+                                    categoryForBudget = cat
+                                } label: {
+                                    if let b = catSum?.budgetAmount, let pct = catSum?.percentageOfBudget {
+                                        PLABreakdownBarRow(
+                                            title: cat.name,
+                                            valueText: PLAFormatters.rupiah(catSum?.totalSpent ?? 0),
+                                            subtitle: "Batas \(PLAFormatters.rupiah(b)) • \(Int((pct * 100).rounded()))%",
+                                            progress: pct,
+                                            barColor: PLATokens.color(for: catSum?.status ?? .safe)
+                                        )
+                                    } else {
+                                        HStack {
+                                            Text(cat.name)
+                                                .font(.subheadline.weight(.medium))
+                                                .foregroundStyle(PLATokens.Colors.textPrimary)
+                                            Spacer()
+                                            Text("Atur batas")
+                                                .font(.caption.weight(.semibold))
+                                                .foregroundStyle(PLATokens.Colors.accent)
+                                        }
+                                        .frame(minHeight: 36)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.top, PLATokens.Spacing.md)
+                    } label: {
+                        Text("Anggaran Per Kategori")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(PLATokens.Colors.textPrimary)
+                    }
+                    .tint(PLATokens.Colors.accent)
                 }
             }
+        }
+    }
+
+    private func summaryLine(label: String, value: String, valueColor: Color = PLATokens.Colors.textPrimary) -> some View {
+        AdaptiveKeyValueRow {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(PLATokens.Colors.textSecondary)
+        } trailing: {
+            Text(value)
+                .font(.subheadline.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(valueColor)
         }
     }
 
@@ -524,42 +440,37 @@ struct FinanceView: View {
         let matched = filteredTransactions
         let visible = Array(matched.prefix(txVisibleLimit))
 
-        PLACard(padding: PLATokens.Spacing.md) {
-            VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
-                HStack(spacing: PLATokens.Spacing.sm) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                    TextField("Cari catatan, kategori, atau akun...", text: $txSearchText)
-                        .font(.subheadline)
-                    if !txSearchText.isEmpty {
-                        Button {
-                            txSearchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(PLATokens.Colors.textSecondary)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Bersihkan pencarian")
+        VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
+            // Clean minimalist search capsule
+            HStack(spacing: PLATokens.Spacing.sm) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(PLATokens.Colors.textSecondary)
+                TextField("Cari catatan, kategori, atau akun...", text: $txSearchText)
+                    .font(.subheadline)
+                if !txSearchText.isEmpty {
+                    Button {
+                        txSearchText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
+                            .frame(width: 32, height: 32)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Bersihkan pencarian")
                 }
-                .padding(.horizontal, PLATokens.Spacing.md)
-                .frame(minHeight: 42)
-                .background(PLATokens.Colors.elevatedSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(PLATokens.Colors.border, lineWidth: 1)
-                )
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 46)
+            .background(PLATokens.Colors.surface, in: Capsule())
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: PLATokens.Spacing.xs) {
-                        filterChip("Semua", active: txTypeFilter == nil) { txTypeFilter = nil }
-                        filterChip("Pengeluaran", active: txTypeFilter == .expense) { txTypeFilter = .expense }
-                        filterChip("Pemasukan", active: txTypeFilter == .income) { txTypeFilter = .income }
-                        filterChip("Transfer", active: txTypeFilter == .transfer) { txTypeFilter = .transfer }
-                    }
-                }
+            // Compact filter chips + pickers row
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: PLATokens.Spacing.xs) {
+                    filterChip("Semua", active: txTypeFilter == nil) { txTypeFilter = nil }
+                    filterChip("Pengeluaran", active: txTypeFilter == .expense) { txTypeFilter = .expense }
+                    filterChip("Pemasukan", active: txTypeFilter == .income) { txTypeFilter = .income }
+                    filterChip("Transfer", active: txTypeFilter == .transfer) { txTypeFilter = .transfer }
 
-                HStack(spacing: PLATokens.Spacing.sm) {
                     Menu {
                         Button("Semua Akun") { txAccountFilter = nil }
                         ForEach(store.accounts) { acc in
@@ -567,16 +478,17 @@ struct FinanceView: View {
                         }
                     } label: {
                         HStack(spacing: 4) {
-                            Text(txAccountFilter.map { store.accountName(for: $0) } ?? "Semua Akun")
+                            Text(txAccountFilter.map { store.accountName(for: $0) } ?? "Akun")
                                 .font(.caption.weight(.semibold))
-                                .lineLimit(1)
                             Image(systemName: "chevron.down")
                                 .font(.caption2)
                         }
-                        .foregroundStyle(PLATokens.Colors.textPrimary)
-                        .padding(.horizontal, 10)
-                        .frame(maxWidth: .infinity, minHeight: 38)
-                        .background(PLATokens.Colors.elevatedSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .foregroundStyle(txAccountFilter == nil ? PLATokens.Colors.textPrimary : Color.white)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 36)
+                        .background(
+                            Capsule().fill(txAccountFilter == nil ? PLATokens.Colors.surface : PLATokens.Colors.primaryBlue)
+                        )
                     }
 
                     Menu {
@@ -586,48 +498,52 @@ struct FinanceView: View {
                         }
                     } label: {
                         HStack(spacing: 4) {
-                            Text(txCategoryFilter.map { store.categoryName(for: $0) } ?? "Semua Kategori")
+                            Text(txCategoryFilter.map { store.categoryName(for: $0) } ?? "Kategori")
                                 .font(.caption.weight(.semibold))
-                                .lineLimit(1)
                             Image(systemName: "chevron.down")
                                 .font(.caption2)
                         }
-                        .foregroundStyle(PLATokens.Colors.textPrimary)
-                        .padding(.horizontal, 10)
-                        .frame(maxWidth: .infinity, minHeight: 38)
-                        .background(PLATokens.Colors.elevatedSurface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .foregroundStyle(txCategoryFilter == nil ? PLATokens.Colors.textPrimary : Color.white)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 36)
+                        .background(
+                            Capsule().fill(txCategoryFilter == nil ? PLATokens.Colors.surface : PLATokens.Colors.primaryBlue)
+                        )
+                    }
+                }
+            }
+
+            AdaptiveKeyValueRow {
+                Text("\(matched.count) transaksi")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(PLATokens.Colors.textSecondary)
+            } trailing: {
+                MoneyText(
+                    amount: filteredSubtotal,
+                    style: .footnote.weight(.bold),
+                    color: filteredSubtotal >= 0 ? PLATokens.Colors.safe : PLATokens.Colors.danger
+                )
+            }
+            .padding(.horizontal, 4)
+
+            if visible.isEmpty {
+                PLAEmptyStateView(
+                    title: "Tidak Ada Transaksi",
+                    message: "Catat pemasukan atau pengeluaran baru untuk mulai memantau arus kas.",
+                    systemImage: "tray",
+                    actionTitle: "Catat Pengeluaran",
+                    action: { showAddExpense = true }
+                )
+            } else {
+                PLAGroupList {
+                    ForEach(Array(visible.enumerated()), id: \.element.id) { idx, tx in
+                        transactionRow(tx)
+                        if idx < visible.count - 1 {
+                            PLAInsetDivider(leadingInset: 48)
+                        }
                     }
                 }
 
-                Divider()
-
-                AdaptiveKeyValueRow {
-                    Text("\(matched.count) transaksi cocok")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                } trailing: {
-                    MoneyText(
-                        amount: filteredSubtotal,
-                        style: .footnote.weight(.bold),
-                        color: filteredSubtotal >= 0 ? PLATokens.Colors.safe : PLATokens.Colors.danger
-                    )
-                }
-            }
-        }
-
-        if visible.isEmpty {
-            PLAEmptyStateView(
-                title: "Tidak Ada Transaksi",
-                message: "Catat pemasukan atau pengeluaran baru untuk mulai memantau arus kas.",
-                systemImage: "tray",
-                actionTitle: "Catat Pengeluaran",
-                action: { showAddExpense = true }
-            )
-        } else {
-            VStack(spacing: PLATokens.Spacing.sm) {
-                ForEach(visible) { tx in
-                    transactionCard(tx)
-                }
                 if matched.count > txVisibleLimit {
                     Button("Muat Lebih Banyak (\(matched.count - txVisibleLimit) tersisa)") {
                         txVisibleLimit += 50
@@ -644,16 +560,16 @@ struct FinanceView: View {
         Button(title, action: action)
             .font(.caption.weight(.semibold))
             .padding(.horizontal, 12)
-            .frame(minHeight: 34)
+            .frame(minHeight: 36)
             .background(
                 Capsule()
-                    .fill(active ? PLATokens.Colors.primaryBlue : PLATokens.Colors.elevatedSurface)
+                    .fill(active ? PLATokens.Colors.primaryBlue : PLATokens.Colors.surface)
             )
             .foregroundStyle(active ? Color.white : PLATokens.Colors.textPrimary)
             .buttonStyle(.plain)
     }
 
-    private func transactionCard(_ tx: PLATransaction) -> some View {
+    private func transactionRow(_ tx: PLATransaction) -> some View {
         let isFuture = tx.dateLocal > store.today
         let cat = store.categories.first { $0.id == tx.categoryId }
         let badgeColor: Color = tx.type == .income ? PLATokens.Colors.safe : (tx.type == .expense ? PLATokens.Colors.danger : PLATokens.Colors.accent)
@@ -661,86 +577,66 @@ struct FinanceView: View {
             ? "arrow.left.arrow.right"
             : (cat?.iconName ?? (tx.type == .income ? "arrow.down.left" : "tag.fill"))
 
-        return PLACard(padding: PLATokens.Spacing.md, cornerRadius: 18) {
-            HStack(alignment: .center, spacing: PLATokens.Spacing.md) {
+        return Button {
+            if tx.type != .transfer {
+                editingTransaction = tx
+            }
+        } label: {
+            AdaptiveKeyValueRow {
+                HStack(spacing: PLATokens.Spacing.md) {
+                    PLAIconBadge(systemName: badgeIcon, color: badgeColor, size: 34)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(tx.type == .transfer
+                             ? "Transfer: \(store.accountName(for: tx.accountId)) -> \(store.accountName(for: tx.destinationAccountId))"
+                             : store.categoryName(for: tx.categoryId))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(PLATokens.Colors.textPrimary)
+                            .multilineTextAlignment(.leading)
+
+                        Text(transactionSubtitle(tx, isFuture: isFuture))
+                            .font(.caption)
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+            } trailing: {
+                let prefix = tx.type == .income ? "+" : (tx.type == .expense ? "-" : "")
+                Text("\(prefix)\(PLAFormatters.rupiah(tx.amount))")
+                    .font(.subheadline.weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(badgeColor)
+            }
+            .padding(.vertical, PLATokens.Spacing.sm)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if tx.type != .transfer {
                 Button {
-                    if tx.type != .transfer {
-                        editingTransaction = tx
-                    }
+                    editingTransaction = tx
                 } label: {
-                    AdaptiveKeyValueRow {
-                        HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: badgeIcon, color: badgeColor, size: 36)
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(spacing: PLATokens.Spacing.xs) {
-                                    Text(tx.type == .transfer
-                                         ? "Transfer: \(store.accountName(for: tx.accountId)) -> \(store.accountName(for: tx.destinationAccountId))"
-                                         : store.categoryName(for: tx.categoryId))
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(PLATokens.Colors.textPrimary)
-                                        .multilineTextAlignment(.leading)
-                                    if isFuture {
-                                        StatusBadge(text: "Mendatang", icon: "clock", color: PLATokens.Colors.accent)
-                                    }
-                                }
-
-                                HStack(spacing: PLATokens.Spacing.xs) {
-                                    Text(PLAFormatters.shortDate(tx.dateLocal))
-                                        .font(.caption)
-                                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                                    if tx.type != .transfer {
-                                        Text("• \(store.accountName(for: tx.accountId))")
-                                            .font(.caption)
-                                            .foregroundStyle(PLATokens.Colors.textSecondary)
-                                    }
-                                    if tx.billId != nil {
-                                        Label("Tagihan", systemImage: "checkmark.seal.fill")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(PLATokens.Colors.accent)
-                                    }
-                                }
-
-                                if let note = tx.note, !note.isEmpty {
-                                    Text(note)
-                                        .font(.caption)
-                                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                                        .lineLimit(2)
-                                        .multilineTextAlignment(.leading)
-                                }
-                            }
-                        }
-                    } trailing: {
-                        let prefix = tx.type == .income ? "+" : (tx.type == .expense ? "-" : "")
-                        Text("\(prefix)\(PLAFormatters.rupiah(tx.amount))")
-                            .font(.subheadline.weight(.bold))
-                            .monospacedDigit()
-                            .foregroundStyle(badgeColor)
-                    }
+                    Label("Sunting", systemImage: "pencil")
                 }
-                .buttonStyle(.plain)
-
-                Menu {
-                    if tx.type != .transfer {
-                        Button {
-                            editingTransaction = tx
-                        } label: {
-                            Label("Sunting", systemImage: "pencil")
-                        }
-                    }
-                    Button(role: .destructive) {
-                        store.deleteTransaction(id: tx.id)
-                    } label: {
-                        Label("Hapus", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                        .frame(width: 32, height: 36)
-                }
-                .accessibilityLabel("Opsi transaksi")
+            }
+            Button(role: .destructive) {
+                store.deleteTransaction(id: tx.id)
+            } label: {
+                Label("Hapus", systemImage: "trash")
             }
         }
+    }
+
+    private func transactionSubtitle(_ tx: PLATransaction, isFuture: Bool) -> String {
+        var parts: [String] = [PLAFormatters.shortDate(tx.dateLocal)]
+        if tx.type != .transfer {
+            parts.append(store.accountName(for: tx.accountId))
+        }
+        if isFuture {
+            parts.append("Mendatang")
+        }
+        if let note = tx.note, !note.isEmpty {
+            parts.append(note)
+        }
+        return parts.joined(separator: " • ")
     }
 
     // MARK: - 3. Tagihan (F-10)
@@ -753,7 +649,7 @@ struct FinanceView: View {
         if store.activeBills.isEmpty {
             PLAEmptyStateView(
                 title: "Belum Ada Tagihan",
-                message: "Catat tagihan kos, listrik, internet, atau langganan rutin agar pengingat jatuh tempo dan pencatatan lunas otomatis berjalan.",
+                message: "Catat tagihan kos, listrik, internet, atau langganan rutin agar pengingat dan pencatatan lunas otomatis berjalan.",
                 systemImage: "calendar.badge.exclamationmark",
                 actionTitle: "Tambah Tagihan",
                 action: { showAddBill = true }
@@ -761,9 +657,14 @@ struct FinanceView: View {
         } else {
             if !overdue.isEmpty {
                 VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-                    PLASectionHeader(title: "Jatuh Tempo Terlewat (\(overdue.count))")
-                    ForEach(overdue) { bill in
-                        billCard(bill, overdue: true)
+                    PLASectionHeader(title: "Terlewat (\(overdue.count))")
+                    PLAGroupList {
+                        ForEach(Array(overdue.enumerated()), id: \.element.id) { idx, bill in
+                            billRow(bill, overdue: true)
+                            if idx < overdue.count - 1 {
+                                PLAInsetDivider()
+                            }
+                        }
                     }
                 }
             }
@@ -771,8 +672,13 @@ struct FinanceView: View {
             if !upcoming.isEmpty {
                 VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
                     PLASectionHeader(title: "Akan Datang (\(upcoming.count))")
-                    ForEach(upcoming) { bill in
-                        billCard(bill, overdue: false)
+                    PLAGroupList {
+                        ForEach(Array(upcoming.enumerated()), id: \.element.id) { idx, bill in
+                            billRow(bill, overdue: false)
+                            if idx < upcoming.count - 1 {
+                                PLAInsetDivider()
+                            }
+                        }
                     }
                 }
             }
@@ -783,101 +689,79 @@ struct FinanceView: View {
         }
     }
 
-    private func billCard(_ bill: Bill, overdue: Bool) -> some View {
+    private func billRow(_ bill: Bill, overdue: Bool) -> some View {
         let rule = store.recurrenceRule(for: bill.recurrenceRuleId)
         let tint = bill.isTrial ? PLATokens.Colors.warning : (overdue ? PLATokens.Colors.danger : PLATokens.Colors.accent)
 
-        return PLACard(padding: PLATokens.Spacing.lg) {
-            VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
-                HStack(alignment: .top, spacing: PLATokens.Spacing.sm) {
-                    AdaptiveKeyValueRow {
-                        HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: bill.isTrial ? "hourglass" : "creditcard.fill", color: tint, size: 38)
-                            VStack(alignment: .leading, spacing: 3) {
-                                HStack(spacing: PLATokens.Spacing.xs) {
-                                    Text(bill.name)
-                                        .font(.subheadline.weight(.bold))
-                                        .foregroundStyle(PLATokens.Colors.textPrimary)
-                                    if bill.isTrial {
-                                        StatusBadge(text: "Trial", icon: "hourglass", color: PLATokens.Colors.warning)
-                                    } else if overdue {
-                                        StatusBadge(text: "Terlewat", icon: "exclamationmark.triangle.fill", color: PLATokens.Colors.danger)
-                                    }
-                                }
-                                Text(bill.isTrial
-                                     ? "Trial berakhir: \(PLAFormatters.shortDate(bill.effectiveDueOrTrialEndDate))"
-                                     : "Jatuh tempo: \(PLAFormatters.shortDate(bill.nextDueDateLocal))")
-                                    .font(.caption)
-                                    .foregroundStyle(overdue ? PLATokens.Colors.danger : PLATokens.Colors.textSecondary)
-                                HStack(spacing: PLATokens.Spacing.xs) {
-                                    if let rule {
-                                        Label(PLAFormatters.recurrenceLabel(rule), systemImage: "repeat")
-                                            .font(.caption2)
-                                            .foregroundStyle(PLATokens.Colors.textSecondary)
-                                    }
-                                    Text("• \(store.accountName(for: bill.defaultAccountId))")
-                                        .font(.caption2)
-                                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                                }
-                            }
-                        }
-                    } trailing: {
-                        MoneyText(amount: bill.amount, style: .subheadline.weight(.bold))
-                    }
-
-                    Menu {
-                        Button {
-                            editingBill = bill
-                        } label: {
-                            Label("Sunting", systemImage: "pencil")
-                        }
-                        Button(role: .destructive) {
-                            store.deleteBill(id: bill.id)
-                        } label: {
-                            Label("Hapus", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.caption.weight(.bold))
+        return VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
+            AdaptiveKeyValueRow {
+                HStack(spacing: PLATokens.Spacing.md) {
+                    PLAIconBadge(systemName: bill.isTrial ? "hourglass" : "creditcard.fill", color: tint, size: 36)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(bill.name)
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(PLATokens.Colors.textPrimary)
+                        Text(bill.isTrial
+                             ? "Trial berakhir \(PLAFormatters.shortDate(bill.effectiveDueOrTrialEndDate))"
+                             : "Jatuh tempo \(PLAFormatters.shortDate(bill.nextDueDateLocal))")
+                            .font(.caption)
+                            .foregroundStyle(overdue ? PLATokens.Colors.danger : PLATokens.Colors.textSecondary)
+                        Text([rule.map { PLAFormatters.recurrenceLabel($0) }, store.accountName(for: bill.defaultAccountId)]
+                            .compactMap { $0 }
+                            .joined(separator: " • "))
+                            .font(.caption2)
                             .foregroundStyle(PLATokens.Colors.textSecondary)
-                            .frame(width: 32, height: 32)
                     }
-                    .accessibilityLabel("Opsi tagihan \(bill.name)")
                 }
+            } trailing: {
+                MoneyText(amount: bill.amount, style: .subheadline.weight(.bold))
+            }
 
-                HStack(spacing: PLATokens.Spacing.sm) {
-                    Button {
-                        billToPay = bill
-                    } label: {
-                        Label("Tandai Lunas", systemImage: "checkmark.circle.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.white)
-                            .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
-                            .background(PLATokens.Colors.safe, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-
-                    Button("Lewati") {
-                        billToSkip = bill
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(PLATokens.Colors.textPrimary)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: PLATokens.minTouchTarget)
-                    .background(PLATokens.Colors.elevatedSurface, in: Capsule())
-                    .overlay(Capsule().stroke(PLATokens.Colors.border, lineWidth: 1))
-                    .buttonStyle(.plain)
+            HStack(spacing: PLATokens.Spacing.sm) {
+                Button {
+                    billToPay = bill
+                } label: {
+                    Label("Tandai Lunas", systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
+                        .background(PLATokens.Colors.safe, in: Capsule())
                 }
+                .buttonStyle(.plain)
+
+                Button("Lewati") {
+                    billToSkip = bill
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(PLATokens.Colors.textPrimary)
+                .padding(.horizontal, 16)
+                .frame(minHeight: PLATokens.minTouchTarget)
+                .background(PLATokens.Colors.elevatedSurface, in: Capsule())
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, PLATokens.Spacing.md)
+        .contextMenu {
+            Button {
+                editingBill = bill
+            } label: {
+                Label("Sunting", systemImage: "pencil")
+            }
+            Button(role: .destructive) {
+                store.deleteBill(id: bill.id)
+            } label: {
+                Label("Hapus", systemImage: "trash")
             }
         }
     }
 
-    // MARK: - 4. Akun (F-07)
+    // MARK: - 4. Dompet (Akun + Target Tabungan)
 
     @ViewBuilder
-    private var accountsContent: some View {
+    private var walletContent: some View {
         let balances = store.accountBalances
 
+        // Total Liquidity Hero
         PLAHeroCard(gradient: PLATokens.heroGradient) {
             VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
                 HStack {
@@ -906,7 +790,7 @@ struct FinanceView: View {
                     Label("Transfer Antar Akun", systemImage: "arrow.left.arrow.right.circle.fill")
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(PLATokens.Colors.obsidianCard)
-                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
                         .background(Color.white, in: Capsule())
                 }
                 .buttonStyle(.plain)
@@ -915,6 +799,7 @@ struct FinanceView: View {
             }
         }
 
+        // Active Accounts (Single Grouped Surface)
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             PLASectionHeader(
                 title: "Akun Aktif",
@@ -931,20 +816,28 @@ struct FinanceView: View {
                     action: { showAddAccount = true }
                 )
             } else {
-                ForEach(store.activeAccounts) { acc in
-                    let bal = balances[acc.id] ?? acc.initialBalance
-                    accountCard(acc, balance: bal)
+                PLAGroupList {
+                    ForEach(Array(store.activeAccounts.enumerated()), id: \.element.id) { idx, acc in
+                        let bal = balances[acc.id] ?? acc.initialBalance
+                        accountRow(acc, balance: bal)
+                        if idx < store.activeAccounts.count - 1 {
+                            PLAInsetDivider(leadingInset: 48)
+                        }
+                    }
                 }
             }
         }
 
         if !store.archivedAccounts.isEmpty {
-            PLACard(padding: PLATokens.Spacing.md) {
+            PLACard(padding: PLATokens.Spacing.lg) {
                 DisclosureGroup("Akun Diarsipkan (\(store.archivedAccounts.count))", isExpanded: $showArchivedAccounts) {
-                    VStack(spacing: PLATokens.Spacing.sm) {
-                        ForEach(store.archivedAccounts) { acc in
+                    VStack(spacing: 0) {
+                        ForEach(Array(store.archivedAccounts.enumerated()), id: \.element.id) { idx, acc in
                             let bal = balances[acc.id] ?? acc.initialBalance
-                            accountCard(acc, balance: bal)
+                            accountRow(acc, balance: bal)
+                            if idx < store.archivedAccounts.count - 1 {
+                                PLAInsetDivider(leadingInset: 48)
+                            }
                         }
                     }
                     .padding(.top, PLATokens.Spacing.sm)
@@ -953,301 +846,154 @@ struct FinanceView: View {
                 .foregroundStyle(PLATokens.Colors.textPrimary)
             }
         }
-    }
 
-    private func accountCard(_ acc: Account, balance: Int64) -> some View {
-        PLACard(padding: PLATokens.Spacing.md, cornerRadius: 18) {
-            HStack(spacing: PLATokens.Spacing.sm) {
-                Button {
-                    editingAccount = acc
-                } label: {
-                    AdaptiveKeyValueRow {
-                        HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: acc.iconName, color: PLATokens.Colors.accent, size: 38)
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack(spacing: PLATokens.Spacing.xs) {
-                                    Text(acc.name)
-                                        .font(.subheadline.weight(.bold))
-                                        .foregroundStyle(PLATokens.Colors.textPrimary)
-                                    if acc.isDefault {
-                                        Text("Utama")
-                                            .font(.caption2.weight(.semibold))
-                                            .padding(.horizontal, 7)
-                                            .padding(.vertical, 2)
-                                            .background(PLATokens.Colors.softBlueTint, in: Capsule())
-                                            .foregroundStyle(PLATokens.Colors.softBlueText)
-                                    }
-                                }
-                                Text(PLAFormatters.accountTypeLabel(acc.type))
-                                    .font(.caption)
-                                    .foregroundStyle(PLATokens.Colors.textSecondary)
-                            }
-                        }
-                    } trailing: {
-                        HStack(spacing: PLATokens.Spacing.xs) {
-                            if balance < 0 {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(PLATokens.Colors.danger)
-                                    .accessibilityLabel("Saldo negatif")
-                            }
-                            MoneyText(
-                                amount: balance,
-                                style: .subheadline.weight(.bold),
-                                color: balance < 0 ? PLATokens.Colors.danger : PLATokens.Colors.textPrimary
-                            )
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-
-                if !acc.isArchived {
-                    Menu {
-                        Button {
-                            editingAccount = acc
-                        } label: {
-                            Label("Sunting", systemImage: "pencil")
-                        }
-                        Button(role: .destructive) {
-                            store.deleteOrArchiveAccount(acc)
-                        } label: {
-                            Label("Hapus / Arsipkan", systemImage: "archivebox")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(PLATokens.Colors.textSecondary)
-                            .frame(width: 32, height: 36)
-                    }
-                    .accessibilityLabel("Opsi akun \(acc.name)")
-                }
-            }
-        }
-    }
-
-    // MARK: - 5. Anggaran (F-09)
-
-    @ViewBuilder
-    private var budgetsContent: some View {
-        let s = store.financialSummary
-
-        PLACard(padding: PLATokens.Spacing.lg) {
-            VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
-                AdaptiveKeyValueRow {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Anggaran Total Bulanan")
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(PLATokens.Colors.textPrimary)
-                        Text(PLAFormatters.periodRange(s.period))
-                            .font(.caption)
-                            .foregroundStyle(PLATokens.Colors.textSecondary)
-                    }
-                } trailing: {
-                    StatusBadge(
-                        text: PLATokens.label(for: s.budgetStatus),
-                        icon: PLATokens.icon(for: s.budgetStatus),
-                        color: PLATokens.color(for: s.budgetStatus)
-                    )
-                }
-
-                if let totalBudget = s.totalBudget, let pct = s.percentUsed {
-                    PLABreakdownBarRow(
-                        title: "Terpakai (\(Int((pct * 100).rounded()))%)",
-                        valueText: PLAFormatters.rupiah(s.totalExpense),
-                        subtitle: "Batas \(PLAFormatters.rupiah(totalBudget)) • Sisa \(PLAFormatters.rupiah(s.remainingBudget ?? 0))",
-                        progress: pct,
-                        barColor: PLATokens.color(for: s.budgetStatus)
-                    )
-                } else {
-                    Text("Belum diatur. Tetapkan batas total untuk mengaktifkan indikator keamanan belanja.")
-                        .font(.subheadline)
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                }
-
-                PLAPrimaryPillButton(title: s.totalBudget == nil ? "Tetapkan Anggaran Total" : "Ubah Anggaran Total") {
-                    showTotalBudgetSheet = true
-                }
-
-                Text("Transfer antar akun tidak dihitung ke dalam realisasi anggaran. Tanggal mulai siklus dapat diubah di Pengaturan.")
-                    .font(.caption)
-                    .foregroundStyle(PLATokens.Colors.textSecondary)
-            }
-        }
-
+        // Savings Goals (P-03) integrated cleanly below Accounts
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-            PLASectionHeader(title: "Anggaran Per Kategori")
-            PLACard(padding: PLATokens.Spacing.lg) {
-                VStack(spacing: PLATokens.Spacing.md) {
-                    ForEach(store.expenseCategories) { cat in
-                        let catSum = s.categorySummaries.first { $0.id == cat.id }
-                        Button {
-                            categoryForBudget = cat
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                if let b = catSum?.budgetAmount, let pct = catSum?.percentageOfBudget {
-                                    PLABreakdownBarRow(
-                                        title: cat.name,
-                                        valueText: "\(PLAFormatters.rupiah(catSum?.totalSpent ?? 0))",
-                                        subtitle: "Batas \(PLAFormatters.rupiah(b)) • \(Int((pct * 100).rounded()))%",
-                                        progress: pct,
-                                        barColor: PLATokens.color(for: catSum?.status ?? .safe)
-                                    )
-                                } else {
-                                    HStack {
-                                        PLAIconBadge(systemName: cat.iconName, color: PLATokens.Colors.accent, size: 32, iconFont: .caption.weight(.bold))
-                                        Text(cat.name)
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(PLATokens.Colors.textPrimary)
-                                        Spacer()
-                                        Text("Atur")
-                                            .font(.caption.weight(.semibold))
-                                            .foregroundStyle(PLATokens.Colors.accent)
-                                    }
-                                    .frame(minHeight: PLATokens.minTouchTarget)
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-
-                        if cat.id != store.expenseCategories.last?.id {
-                            Divider()
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - 6. Target Tabungan (P-03)
-
-    @ViewBuilder
-    private var savingsContent: some View {
-        let totalSaved = store.activeSavingsGoals.reduce(Int64(0)) { $0 + $1.currentAmount }
-        let totalTarget = store.activeSavingsGoals.reduce(Int64(0)) { $0 + $1.targetAmount }
-
-        if !store.activeSavingsGoals.isEmpty {
-            PLAHeroCard(gradient: PLATokens.heroGradient) {
-                VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-                    Text("Total Tabungan Terkumpul")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Color.white.opacity(0.84))
-                    MoneyText(
-                        amount: totalSaved,
-                        style: .system(.title2, design: .rounded).weight(.bold),
-                        color: Color.white
-                    )
-                    if totalTarget > 0 {
-                        ProgressView(value: min(Double(totalSaved) / Double(totalTarget), 1.0))
-                            .tint(Color.white)
-                            .background(Color.white.opacity(0.24), in: Capsule())
-                        Text("Dari total target \(PLAFormatters.rupiah(totalTarget))")
-                            .font(.caption)
-                            .foregroundStyle(Color.white.opacity(0.84))
-                    }
-                }
-            }
-        }
-
-        if store.activeSavingsGoals.isEmpty {
-            PLAEmptyStateView(
-                title: "Belum Ada Target Tabungan",
-                message: "Buat target tabungan seperti Dana Darurat atau Laptop Baru untuk menghitung setoran bulanan secara otomatis.",
-                systemImage: "target",
-                tint: PLATokens.Colors.accent,
-                actionTitle: "Tambah Target Tabungan",
+            PLASectionHeader(
+                title: "Target Tabungan",
+                actionTitle: "Tambah",
                 action: { showAddSavingsGoal = true }
             )
-        } else {
-            VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-                PLASectionHeader(
-                    title: "Target Tabungan Aktif",
-                    actionTitle: "Tambah",
-                    action: { showAddSavingsGoal = true }
-                )
 
-                ForEach(store.activeSavingsGoals) { goal in
-                    savingsGoalCard(goal)
+            if store.activeSavingsGoals.isEmpty {
+                PLACard(padding: PLATokens.Spacing.lg) {
+                    VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+                        Text("Belum ada target tabungan.")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(PLATokens.Colors.textPrimary)
+                        Text("Buat target seperti Dana Darurat atau Laptop Baru untuk menghitung setoran bulanan otomatis.")
+                            .font(.caption)
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
+                    }
+                }
+            } else {
+                PLAGroupList {
+                    ForEach(Array(store.activeSavingsGoals.enumerated()), id: \.element.id) { idx, goal in
+                        savingsGoalRow(goal)
+                        if idx < store.activeSavingsGoals.count - 1 {
+                            PLAInsetDivider()
+                        }
+                    }
                 }
             }
         }
     }
 
-    private func savingsGoalCard(_ goal: SavingsGoal) -> some View {
+    private func accountRow(_ acc: Account, balance: Int64) -> some View {
+        Button {
+            editingAccount = acc
+        } label: {
+            AdaptiveKeyValueRow {
+                HStack(spacing: PLATokens.Spacing.md) {
+                    PLAIconBadge(systemName: acc.iconName, color: PLATokens.Colors.accent, size: 34)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: PLATokens.Spacing.xs) {
+                            Text(acc.name)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(PLATokens.Colors.textPrimary)
+                            if acc.isDefault {
+                                Text("Utama")
+                                    .font(.caption2.weight(.semibold))
+                                    .padding(.horizontal, 7)
+                                    .padding(.vertical, 2)
+                                    .background(PLATokens.Colors.softBlueTint, in: Capsule())
+                                    .foregroundStyle(PLATokens.Colors.softBlueText)
+                            }
+                        }
+                        Text(PLAFormatters.accountTypeLabel(acc.type))
+                            .font(.caption)
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
+                    }
+                }
+            } trailing: {
+                HStack(spacing: PLATokens.Spacing.xs) {
+                    if balance < 0 {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(PLATokens.Colors.danger)
+                            .accessibilityLabel("Saldo negatif")
+                    }
+                    MoneyText(
+                        amount: balance,
+                        style: .subheadline.weight(.bold),
+                        color: balance < 0 ? PLATokens.Colors.danger : PLATokens.Colors.textPrimary
+                    )
+                }
+            }
+            .padding(.vertical, PLATokens.Spacing.sm)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                editingAccount = acc
+            } label: {
+                Label("Sunting", systemImage: "pencil")
+            }
+            if !acc.isArchived {
+                Button(role: .destructive) {
+                    store.deleteOrArchiveAccount(acc)
+                } label: {
+                    Label("Hapus / Arsipkan", systemImage: "archivebox")
+                }
+            }
+        }
+    }
+
+    private func savingsGoalRow(_ goal: SavingsGoal) -> some View {
         let prog = SavingsGoalCalculator.evaluate(goal: goal, today: store.today)
         let goalTint = prog.paceStatus == .achieved ? PLATokens.Colors.safe : PLATokens.Colors.primaryBlue
 
-        return PLACard(padding: PLATokens.Spacing.lg) {
-            VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
-                HStack(alignment: .top, spacing: PLATokens.Spacing.sm) {
-                    PLABreakdownBarRow(
-                        title: goal.name,
-                        valueText: prog.paceStatus == .achieved ? "Tercapai" : "\(Int((prog.percentComplete * 100).rounded()))%",
-                        subtitle: goal.targetDateLocal.map { "Target \(PLAFormatters.shortDate($0))" },
-                        progress: prog.percentComplete,
-                        barColor: goalTint
-                    )
+        return VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+            PLABreakdownBarRow(
+                title: goal.name,
+                valueText: prog.paceStatus == .achieved ? "Tercapai" : "\(Int((prog.percentComplete * 100).rounded()))%",
+                subtitle: "\(PLAFormatters.rupiah(goal.currentAmount)) dari \(PLAFormatters.rupiah(goal.targetAmount))",
+                progress: prog.percentComplete,
+                barColor: goalTint
+            )
 
-                    Menu {
-                        Button {
-                            editingSavingsGoal = goal
-                        } label: {
-                            Label("Sunting", systemImage: "pencil")
-                        }
-                        Button(role: .destructive) {
-                            store.deleteSavingsGoal(id: goal.id)
-                        } label: {
-                            Label("Hapus", systemImage: "trash")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(PLATokens.Colors.textSecondary)
-                            .frame(width: 32, height: 32)
-                    }
-                    .accessibilityLabel("Opsi target tabungan \(goal.name)")
+            if let monthly = prog.requiredMonthlyDeposit, monthly > 0 {
+                Text("Butuh setor \(PLAFormatters.rupiah(monthly))/bulan agar tercapai tepat waktu.")
+                    .font(.caption)
+                    .foregroundStyle(PLATokens.Colors.textSecondary)
+            }
+
+            HStack(spacing: PLATokens.Spacing.sm) {
+                Button {
+                    allocateSavingsTarget = SavingsAllocateRequest(goal: goal, isWithdraw: false)
+                } label: {
+                    Label("Setor", systemImage: "plus.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
+                        .background(PLATokens.Colors.primaryBlue, in: Capsule())
                 }
+                .buttonStyle(.plain)
 
-                AdaptiveKeyValueRow {
-                    Text("Terkumpul: \(PLAFormatters.rupiah(goal.currentAmount))")
-                        .font(.caption)
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                } trailing: {
-                    Text("Target: \(PLAFormatters.rupiah(goal.targetAmount))")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(PLATokens.Colors.textPrimary)
+                Button("Tarik") {
+                    allocateSavingsTarget = SavingsAllocateRequest(goal: goal, isWithdraw: true)
                 }
-
-                if let monthly = prog.requiredMonthlyDeposit, monthly > 0 {
-                    Text("Butuh setor \(PLAFormatters.rupiah(monthly))/bulan agar tercapai tepat waktu.")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(PLATokens.Colors.accent)
-                }
-
-                HStack(spacing: PLATokens.Spacing.sm) {
-                    Button {
-                        allocateSavingsTarget = SavingsAllocateRequest(goal: goal, isWithdraw: false)
-                    } label: {
-                        Label("Setor", systemImage: "plus.circle.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.white)
-                            .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
-                            .background(PLATokens.Colors.primaryBlue, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-
-                    Button("Tarik") {
-                        allocateSavingsTarget = SavingsAllocateRequest(goal: goal, isWithdraw: true)
-                    }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(PLATokens.Colors.textPrimary)
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: PLATokens.minTouchTarget)
-                    .background(PLATokens.Colors.elevatedSurface, in: Capsule())
-                    .overlay(Capsule().stroke(PLATokens.Colors.border, lineWidth: 1))
-                    .buttonStyle(.plain)
-                    .disabled(goal.currentAmount <= 0)
-                    .opacity(goal.currentAmount <= 0 ? 0.45 : 1)
-                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(PLATokens.Colors.textPrimary)
+                .padding(.horizontal, 16)
+                .frame(minHeight: PLATokens.minTouchTarget)
+                .background(PLATokens.Colors.elevatedSurface, in: Capsule())
+                .buttonStyle(.plain)
+                .disabled(goal.currentAmount <= 0)
+                .opacity(goal.currentAmount <= 0 ? 0.45 : 1)
+            }
+        }
+        .padding(.vertical, PLATokens.Spacing.md)
+        .contextMenu {
+            Button {
+                editingSavingsGoal = goal
+            } label: {
+                Label("Sunting", systemImage: "pencil")
+            }
+            Button(role: .destructive) {
+                store.deleteSavingsGoal(id: goal.id)
+            } label: {
+                Label("Hapus", systemImage: "trash")
             }
         }
     }

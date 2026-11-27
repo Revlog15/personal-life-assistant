@@ -233,6 +233,7 @@ struct DiagnosticsView: View {
             }
         }
         .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
+        .toolbar(.visible, for: .navigationBar)
         .navigationTitle("Diagnostik")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Tambah Data Uji Benchmark?", isPresented: $showSeedConfirm) {

@@ -25,35 +25,40 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                // 0. Appearance Mode (Light White-Blue / Dark Midnight-Blue / System)
-                Section {
-                    VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-                        HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: store.appearanceMode.iconName, color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Tema Aplikasi")
-                                    .font(.subheadline.weight(.semibold))
-                                Text("Putih Biru (Terang) atau Gelap Otomatis")
-                                    .font(.caption)
-                                    .foregroundStyle(PLATokens.Colors.textSecondary)
-                            }
-                        }
+            VStack(spacing: 0) {
+                PLAScreenHeader("Pengaturan")
+                    .padding(.horizontal, PLATokens.Spacing.lg)
+                    .padding(.top, PLATokens.Spacing.sm)
+                    .padding(.bottom, PLATokens.Spacing.xs)
 
-                        Picker("Mode Tampilan", selection: Binding(
-                            get: { store.appearanceMode },
-                            set: { store.setAppearanceMode($0) }
-                        )) {
-                            ForEach(AppAppearanceMode.allCases) { mode in
-                                Text(mode.label).tag(mode)
+                Form {
+                    // 0. Appearance Mode (Light White-Blue / Dark Midnight-Blue / System)
+                    Section {
+                        VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+                            HStack(spacing: PLATokens.Spacing.md) {
+                                PLAIconBadge(systemName: store.appearanceMode.iconName, color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Tema Aplikasi")
+                                        .font(.subheadline.weight(.semibold))
+                                    Text("Putih Biru (Terang) atau Gelap Otomatis")
+                                        .font(.caption)
+                                        .foregroundStyle(PLATokens.Colors.textSecondary)
+                                }
                             }
+
+                            PLAGlassSegmentBar(
+                                options: AppAppearanceMode.allCases,
+                                selection: Binding(
+                                    get: { store.appearanceMode },
+                                    set: { store.setAppearanceMode($0) }
+                                ),
+                                title: \.label
+                            )
                         }
-                        .pickerStyle(.segmented)
+                        .padding(.vertical, PLATokens.Spacing.xs)
+                    } header: {
+                        Text("Tampilan")
                     }
-                    .padding(.vertical, PLATokens.Spacing.xs)
-                } header: {
-                    Text("Tampilan")
-                }
 
                 // 1. Notifications & Smart Reminders
                 Section("Pengingat & Notifikasi") {
@@ -206,9 +211,10 @@ struct SettingsView: View {
                 aboutSection
             }
             .scrollContentBackground(.hidden)
-            .background(PLATokens.Colors.canvas)
             .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
-            .navigationTitle("Pengaturan")
+            }
+            .background(PLATokens.Colors.canvas.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
             // JSON Backup FileExporter (AC-13.1)
             .fileExporter(
                 isPresented: $isExportingJSON,
@@ -509,6 +515,7 @@ struct NotificationSettingsDetailView: View {
             }
         }
         .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
+        .toolbar(.visible, for: .navigationBar)
         .navigationTitle("Pengingat & Suara")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -572,6 +579,7 @@ struct FocusModeGuideView: View {
             }
         }
         .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
+        .toolbar(.visible, for: .navigationBar)
         .navigationTitle("Panduan Focus Mode")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -602,6 +610,7 @@ struct SiriAndShortcutsGuideView: View {
             }
         }
         .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
+        .toolbar(.visible, for: .navigationBar)
         .navigationTitle("Siri & Shortcuts")
         .navigationBarTitleDisplayMode(.inline)
     }

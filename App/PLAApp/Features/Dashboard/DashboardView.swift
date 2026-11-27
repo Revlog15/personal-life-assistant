@@ -1,8 +1,8 @@
 import SwiftUI
 import PLACore
 
-/// Dashboard (Beranda): White & Blue architectural layout anchored by an obsidian spending trend card,
-/// collapsible 7-day task completion rings, 2x2 real-metric grid, and actionable daily sections (PRD AC-01.1..01.4).
+/// Dashboard (Beranda): Distilled 3-layer White & Blue hierarchy anchored by the obsidian telemetry card,
+/// flat collapsible 7-day activity rings (zero nested cards), and grouped borderless daily agenda/bills (PRD AC-01.1..01.4).
 struct DashboardView: View {
     @Environment(AppStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -18,16 +18,13 @@ struct DashboardView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: PLATokens.Spacing.lg) {
+                LazyVStack(alignment: .leading, spacing: PLATokens.Spacing.section) {
                     headerBar
                     telemetryHeroSection
-                    quickActionStrip
                     alertBannersSection
                     firstRunGuideSection
-                    weeklyActivityOverviewCard
-                    metricsGridSection
-                    overdueTasksSection
-                    todayTasksSection
+                    weeklyActivitySection
+                    dailyFocusSection
                     upcomingBillsSection
                     insightsSection
                     personalSuggestionsSection
@@ -52,47 +49,32 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Top Header
+    // MARK: - Header (Single Title + Single Quick-Add Menu)
 
     private var headerBar: some View {
-        HStack(alignment: .center, spacing: PLATokens.Spacing.md) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(PLAFormatters.fullDate(store.today))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(PLATokens.Colors.textSecondary)
-                Text(PLAFormatters.greeting(for: store.currentDateTime.hour))
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(PLATokens.Colors.textPrimary)
-            }
-
-            Spacer(minLength: PLATokens.Spacing.sm)
-
-            PLALiquidGlassIconButton(
-                systemImage: store.appearanceMode.iconName,
-                accessibilityLabel: "Ganti tema tampilan (\(store.appearanceMode.label))"
-            ) {
-                store.cycleAppearanceMode()
-            }
-
+        PLAScreenHeader("Beranda") {
             Menu {
-                Button { onQuickAdd(.task) } label: {
-                    Label("Tugas Baru", systemImage: "checklist")
+                Section("Catat Cepat") {
+                    Button { onQuickAdd(.task) } label: {
+                        Label("Tugas Baru", systemImage: "checklist")
+                    }
+                    Button { onQuickAdd(.expense) } label: {
+                        Label("Pengeluaran", systemImage: "arrow.up.right.circle")
+                    }
+                    Button { onQuickAdd(.income) } label: {
+                        Label("Pemasukan", systemImage: "arrow.down.left.circle")
+                    }
+                    Button { onQuickAdd(.transfer) } label: {
+                        Label("Transfer Antar Akun", systemImage: "arrow.left.arrow.right.circle")
+                    }
                 }
-                Button { onQuickAdd(.expense) } label: {
-                    Label("Catat Pengeluaran", systemImage: "arrow.up.right.circle")
-                }
-                Button { onQuickAdd(.income) } label: {
-                    Label("Catat Pemasukan", systemImage: "arrow.down.left.circle")
-                }
-                Button { onQuickAdd(.transfer) } label: {
-                    Label("Transfer Antar Akun", systemImage: "arrow.left.arrow.right.circle")
-                }
-                Divider()
-                Button { onQuickAdd(.scanReceipt) } label: {
-                    Label("Scan Struk (OCR)", systemImage: "doc.text.viewfinder")
-                }
-                Button { onQuickAdd(.whatIf) } label: {
-                    Label("Simulasi Beli (What-If)", systemImage: "slider.horizontal.below.square.filled.and.square")
+                Section("Alat") {
+                    Button { onQuickAdd(.scanReceipt) } label: {
+                        Label("Scan Struk (OCR)", systemImage: "doc.text.viewfinder")
+                    }
+                    Button { onQuickAdd(.whatIf) } label: {
+                        Label("Simulasi Beli", systemImage: "slider.horizontal.3")
+                    }
                 }
             } label: {
                 Image(systemName: "plus")
@@ -105,7 +87,7 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Focal Point: Dark Obsidian Spending Trend Card
+    // MARK: - Layer 1: Obsidian Spending Trend Hero (Integrates Safe Daily Limit)
 
     private var telemetryHeroSection: some View {
         let summary = store.financialSummary
@@ -114,15 +96,21 @@ struct DashboardView: View {
         switch chartRange {
         case .sevenDays:
             points = store.dailyExpenseSeries(days: 7)
-            subtitle = "7 hari terakhir, ketuk titik untuk detail"
+            subtitle = "7 hari terakhir, ketuk titik untuk rincian"
         case .fourteenDays:
             points = store.dailyExpenseSeries(days: 14)
-            subtitle = "14 hari terakhir, ketuk titik untuk detail"
+            subtitle = "14 hari terakhir, ketuk titik untuk rincian"
         case .cycle:
             points = store.cycleDailyExpenseSeries()
-            subtitle = "Siklus \(PLAFormatters.periodRange(summary.period))"
+            subtitle = PLAFormatters.periodRange(summary.period)
         }
         let rangeTotal = points.reduce(Int64(0)) { $0 + $1.amount }
+        let safeDailyText: String = {
+            if let daily = summary.safeDailyLimit {
+                return PLAFormatters.rupiah(daily)
+            }
+            return "Belum diatur"
+        }()
 
         return PLAChartHeroCard(
             title: "Pengeluaran Harian",
@@ -132,6 +120,10 @@ struct DashboardView: View {
             selectedRange: $chartRange,
             status: summary.budgetStatus,
             showStatusBadge: !isFinanceMasked || store.settings.showBudgetStatusWhenLocked,
+            footerLeftLabel: "Batas Aman/Hari",
+            footerLeftValue: safeDailyText,
+            footerRightLabel: "Siklus Aktif",
+            footerRightValue: "\(summary.period.remainingDaysInclusive) hari lagi",
             isMasked: isFinanceMasked,
             onUnlock: {
                 _Concurrency.Task {
@@ -141,53 +133,82 @@ struct DashboardView: View {
         )
     }
 
-    // MARK: - Compact 4-Action Quick Strip
+    // MARK: - Alerts & First-Run Guide
 
-    private var quickActionStrip: some View {
-        HStack(spacing: PLATokens.Spacing.sm) {
-            quickActionButton(title: "Tugas", icon: "plus.circle.fill") {
-                onQuickAdd(.task)
-            }
-            quickActionButton(title: "Catat", icon: "arrow.up.right.circle.fill") {
-                onQuickAdd(.expense)
-            }
-            quickActionButton(title: "Scan OCR", icon: "doc.text.viewfinder") {
-                onQuickAdd(.scanReceipt)
-            }
-            quickActionButton(title: "Simulasi", icon: "slider.horizontal.3") {
-                onQuickAdd(.whatIf)
+    @ViewBuilder
+    private var alertBannersSection: some View {
+        if hasAnyBanner {
+            PLAGroupList {
+                if let dbError = store.databaseErrorMessage {
+                    AlertBannerRow(
+                        icon: "externaldrive.badge.exclamationmark",
+                        tint: PLATokens.Colors.danger,
+                        title: "Masalah Database",
+                        message: dbError
+                    )
+                }
+                if store.sideloadInfo.shouldShowBanner(on: store.today),
+                   let days = store.sideloadInfo.daysRemaining(from: store.today) {
+                    if store.databaseErrorMessage != nil { PLAInsetDivider() }
+                    AlertBannerRow(
+                        icon: "clock.badge.exclamationmark.fill",
+                        tint: PLATokens.Colors.warning,
+                        title: days <= 0 ? "Sertifikat Sideload Kedaluwarsa" : "Masa Berlaku Tinggal \(days) Hari",
+                        message: "Buka SideStore bersama LocalDevVPN untuk memperpanjang aplikasi.",
+                        actionTitle: "Lihat Detail",
+                        action: { selectedTab = .settings }
+                    )
+                }
+                if store.notificationAuthStatus == .denied {
+                    if store.databaseErrorMessage != nil || store.sideloadInfo.shouldShowBanner(on: store.today) {
+                        PLAInsetDivider()
+                    }
+                    AlertBannerRow(
+                        icon: "bell.slash.fill",
+                        tint: PLATokens.Colors.warning,
+                        title: "Notifikasi Nonaktif",
+                        message: "Aktifkan izin notifikasi di Settings iOS agar pengingat berbunyi tepat waktu.",
+                        actionTitle: "Buka Settings iOS",
+                        action: { store.notificationAdapter.openSystemSettings() }
+                    )
+                }
             }
         }
     }
 
-    private func quickActionButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            VStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(PLATokens.Colors.accent)
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(PLATokens.Colors.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+    @ViewBuilder
+    private var firstRunGuideSection: some View {
+        if store.isCompletelyEmpty {
+            PLACard(padding: PLATokens.Spacing.lg) {
+                VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
+                    Text("Mulai Catatan Pertama")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(PLATokens.Colors.textPrimary)
+                    Text("Tambahkan tugas hari ini atau catat pengeluaran agar grafik dan pengingat otomatis mulai berjalan.")
+                        .font(.subheadline)
+                        .foregroundStyle(PLATokens.Colors.textSecondary)
+
+                    HStack(spacing: PLATokens.Spacing.sm) {
+                        PLAPrimaryPillButton(title: "Buat Tugas") {
+                            onQuickAdd(.task)
+                        }
+                        Button("Catat Transaksi") {
+                            onQuickAdd(.expense)
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(PLATokens.Colors.accent)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                        .background(PLATokens.Colors.softBlueTint, in: Capsule())
+                        .buttonStyle(.plain)
+                    }
+                }
             }
-            .frame(maxWidth: .infinity, minHeight: 62)
-            .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(PLATokens.Colors.surface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(PLATokens.Colors.border, lineWidth: 1)
-            )
         }
-        .buttonStyle(.plain)
     }
 
-    // MARK: - Collapsible 7-Day Task Ring Card (Reference Overview Anchor)
+    // MARK: - Layer 2: Collapsible 7-Day Activity Rings (Flat, Zero Nested Boxes)
 
-    private var weeklyActivityOverviewCard: some View {
+    private var weeklyActivitySection: some View {
         let data = store.last7DaysTaskProgress()
         let totalTasks7d = data.points.reduce(0) { $0 + $1.totalCount }
         let doneTasks7d = data.points.reduce(0) { $0 + $1.completedCount }
@@ -206,7 +227,7 @@ struct DashboardView: View {
                         if reduceMotion {
                             isRingsExpanded.toggle()
                         } else {
-                            withAnimation(.easeInOut(duration: 0.22)) {
+                            withAnimation(.easeInOut(duration: 0.2)) {
                                 isRingsExpanded.toggle()
                             }
                         }
@@ -225,299 +246,107 @@ struct DashboardView: View {
                             Image(systemName: isRingsExpanded ? "chevron.up" : "chevron.down")
                                 .font(.caption.weight(.bold))
                                 .foregroundStyle(PLATokens.Colors.textSecondary)
-                                .frame(width: 32, height: 32)
+                                .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
                         }
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(isRingsExpanded ? "Tutup progres tugas 7 hari" : "Buka progres tugas 7 hari")
 
                     if isRingsExpanded {
-                        VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
-                            PLABreakdownBarRow(
-                                title: totalTasks7d > 0 ? "Tercapai" : "Belum ada jadwal 7 hari terakhir",
-                                valueText: totalTasks7d > 0 ? "\(doneTasks7d)/\(totalTasks7d)" : "0",
-                                progress: ratio,
-                                barColor: PLATokens.Colors.primaryBlue
-                            )
+                        PLAInsetDivider()
 
-                            HStack(spacing: 4) {
-                                ForEach(data.points) { point in
-                                    PLAMiniRingDayColumn(point: point)
-                                }
-                            }
-                        }
-                        .padding(PLATokens.Spacing.md)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(PLATokens.Colors.elevatedSurface)
+                        PLABreakdownBarRow(
+                            title: totalTasks7d > 0 ? "Tercapai" : "Belum ada jadwal 7 hari terakhir",
+                            valueText: totalTasks7d > 0 ? "\(doneTasks7d)/\(totalTasks7d)" : "0",
+                            progress: ratio,
+                            barColor: PLATokens.Colors.primaryBlue
                         )
-                    }
-                }
-            }
-        }
-    }
 
-    // MARK: - 2x2 Crisp Metric Grid (Real Local Numbers Only)
-
-    private var metricsGridSection: some View {
-        let summary = store.financialSummary
-        let activeCount = store.todayTasks.count + store.overdueTasks.count
-        let billsTotal = store.upcomingBills7Days.reduce(Int64(0)) { $0 + $1.amount }
-        let columns = [
-            GridItem(.flexible(), spacing: PLATokens.Spacing.md),
-            GridItem(.flexible(), spacing: PLATokens.Spacing.md)
-        ]
-
-        return LazyVGrid(columns: columns, spacing: PLATokens.Spacing.md) {
-            Button {
-                selectedTab = .finance
-            } label: {
-                PLAMetricTile(
-                    title: "Pengeluaran Siklus",
-                    value: isFinanceMasked ? PLAFormatters.maskedRupiah() : PLAFormatters.compactRupiah(summary.totalExpense),
-                    subtitle: "Hari ke-\(summary.period.currentDay) dari \(summary.period.totalDays)",
-                    systemImage: "arrow.up.right"
-                )
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                selectedTab = .finance
-            } label: {
-                let dailyValue: String = {
-                    if isFinanceMasked { return PLAFormatters.maskedRupiah() }
-                    if let daily = summary.safeDailyLimit {
-                        return PLAFormatters.compactRupiah(daily)
-                    }
-                    return "Belum diatur"
-                }()
-                PLAMetricTile(
-                    title: "Batas Aman/Hari",
-                    value: dailyValue,
-                    subtitle: summary.totalBudget == nil ? "Ketuk untuk atur" : PLATokens.label(for: summary.budgetStatus),
-                    systemImage: "shield.checkered",
-                    valueColor: summary.totalBudget == nil ? PLATokens.Colors.textSecondary : PLATokens.color(for: summary.budgetStatus),
-                    iconTint: PLATokens.color(for: summary.budgetStatus)
-                )
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                selectedTab = .tasks
-            } label: {
-                PLAMetricTile(
-                    title: "Tugas Hari Ini",
-                    value: "\(activeCount) tugas",
-                    subtitle: store.overdueTasks.isEmpty ? "Tidak ada terlambat" : "\(store.overdueTasks.count) terlambat",
-                    systemImage: "checklist",
-                    valueColor: store.overdueTasks.isEmpty ? PLATokens.Colors.textPrimary : PLATokens.Colors.danger,
-                    iconTint: store.overdueTasks.isEmpty ? PLATokens.Colors.accent : PLATokens.Colors.danger
-                )
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                selectedTab = .finance
-            } label: {
-                PLAMetricTile(
-                    title: "Tagihan 7 Hari",
-                    value: "\(store.upcomingBills7Days.count) tagihan",
-                    subtitle: isFinanceMasked
-                        ? "Terkunci"
-                        : (billsTotal > 0 ? PLAFormatters.compactRupiah(billsTotal) : "Aman, tidak ada tagihan"),
-                    systemImage: "calendar.badge.clock"
-                )
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    // MARK: - Alerts & Empty Guide
-
-    @ViewBuilder
-    private var alertBannersSection: some View {
-        if hasAnyBanner {
-            VStack(spacing: PLATokens.Spacing.md) {
-                if let dbError = store.databaseErrorMessage {
-                    PLACard {
-                        AlertBannerRow(
-                            icon: "externaldrive.badge.exclamationmark",
-                            tint: PLATokens.Colors.danger,
-                            title: "Masalah Database",
-                            message: dbError
-                        )
-                    }
-                }
-                if store.sideloadInfo.shouldShowBanner(on: store.today),
-                   let days = store.sideloadInfo.daysRemaining(from: store.today) {
-                    PLACard {
-                        AlertBannerRow(
-                            icon: "clock.badge.exclamationmark.fill",
-                            tint: PLATokens.Colors.warning,
-                            title: days <= 0 ? "Sertifikat Sideload Kedaluwarsa" : "Masa Berlaku Aplikasi Tinggal \(days) Hari",
-                            message: "Buka SideStore bersama LocalDevVPN untuk memperpanjang PLA agar data tetap dapat diakses.",
-                            actionTitle: "Lihat Detail",
-                            action: { selectedTab = .settings }
-                        )
-                    }
-                }
-                if store.notificationAuthStatus == .denied {
-                    PLACard {
-                        AlertBannerRow(
-                            icon: "bell.slash.fill",
-                            tint: PLATokens.Colors.warning,
-                            title: "Notifikasi Nonaktif",
-                            message: "Jadwal pengingat tetap tersimpan, tetapi iOS tidak dapat menampilkannya sampai izin diaktifkan.",
-                            actionTitle: "Buka Settings iOS",
-                            action: { store.notificationAdapter.openSystemSettings() }
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var firstRunGuideSection: some View {
-        if store.isCompletelyEmpty {
-            PLACard {
-                VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
-                    HStack(spacing: PLATokens.Spacing.md) {
-                        PLAIconBadge(systemName: "checklist", color: PLATokens.Colors.accent, size: 40)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Mulai Catatan Pertama")
-                                .font(.headline.weight(.bold))
-                                .foregroundStyle(PLATokens.Colors.textPrimary)
-                            Text("Tambahkan tugas hari ini atau catat pengeluaran agar grafik dan pengingat mulai bekerja.")
-                                .font(.footnote)
-                                .foregroundStyle(PLATokens.Colors.textSecondary)
-                        }
-                    }
-
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: PLATokens.Spacing.sm) {
-                            PLAPrimaryPillButton(title: "Buat Tugas Pertama") {
-                                onQuickAdd(.task)
+                        HStack(spacing: 4) {
+                            ForEach(data.points) { point in
+                                PLAMiniRingDayColumn(point: point)
                             }
-                            Button("Catat Transaksi") {
-                                onQuickAdd(.expense)
-                            }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(PLATokens.Colors.accent)
-                            .frame(maxWidth: .infinity, minHeight: 50)
-                            .background(PLATokens.Colors.softBlueTint, in: Capsule())
-                            .buttonStyle(.plain)
                         }
-                        VStack(spacing: PLATokens.Spacing.sm) {
-                            PLAPrimaryPillButton(title: "Buat Tugas Pertama") {
-                                onQuickAdd(.task)
-                            }
-                            Button("Catat Transaksi") {
-                                onQuickAdd(.expense)
-                            }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(PLATokens.Colors.accent)
-                            .frame(maxWidth: .infinity, minHeight: 50)
-                            .background(PLATokens.Colors.softBlueTint, in: Capsule())
-                            .buttonStyle(.plain)
-                        }
+                        .padding(.top, PLATokens.Spacing.xs)
                     }
                 }
             }
         }
     }
 
-    // MARK: - Overdue & Today Tasks
+    // MARK: - Layer 3: Unified Daily Agenda (Overdue + Today in One Calm Grouped Surface)
 
-    @ViewBuilder
-    private var overdueTasksSection: some View {
-        if !store.overdueTasks.isEmpty {
-            VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-                PLASectionHeader(
-                    title: "Terlambat (\(store.overdueTasks.count))",
-                    actionTitle: store.overdueTasks.count > 5 ? "Semua" : nil,
-                    action: store.overdueTasks.count > 5 ? { selectedTab = .tasks } : nil
-                )
+    private var dailyFocusSection: some View {
+        let overdue = Array(store.overdueTasks.prefix(5))
+        let todayList = Array(store.todayTasks.prefix(6))
+        let combined = overdue + todayList
+        let totalActive = store.overdueTasks.count + store.todayTasks.count
 
-                VStack(spacing: PLATokens.Spacing.sm) {
-                    ForEach(store.overdueTasks.prefix(5)) { task in
-                        PLACard(padding: PLATokens.Spacing.md) {
-                            dashboardOverdueTaskRow(task)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var todayTasksSection: some View {
-        VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+        return VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             PLASectionHeader(
                 title: "Agenda Hari Ini",
-                subtitle: PLAFormatters.shortDate(store.today),
-                actionTitle: "Tambah",
-                action: { onQuickAdd(.task) }
+                actionTitle: totalActive > combined.count ? "Semua (\(totalActive))" : "Tambah",
+                action: {
+                    if totalActive > combined.count {
+                        selectedTab = .tasks
+                    } else {
+                        onQuickAdd(.task)
+                    }
+                }
             )
 
-            if store.todayTasks.isEmpty {
-                PLACard(padding: PLATokens.Spacing.md) {
+            if combined.isEmpty {
+                PLACard(padding: PLATokens.Spacing.lg) {
                     HStack(spacing: PLATokens.Spacing.md) {
-                        PLAIconBadge(systemName: "checkmark.seal.fill", color: PLATokens.Colors.safe, size: 36)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Tidak ada tugas jatuh tempo hari ini")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(PLATokens.Colors.textPrimary)
-                            Text("Ketuk Tambah jika ada kegiatan yang ingin dijadwalkan.")
-                                .font(.caption)
-                                .foregroundStyle(PLATokens.Colors.textSecondary)
-                        }
-                        Spacer()
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(PLATokens.Colors.safe)
+                        Text("Tidak ada tugas jatuh tempo hari ini.")
+                            .font(.subheadline)
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
                     }
                 }
             } else {
-                VStack(spacing: PLATokens.Spacing.sm) {
-                    ForEach(store.todayTasks.prefix(6)) { task in
-                        PLACard(padding: PLATokens.Spacing.md) {
-                            dashboardTodayTaskRow(task)
+                PLAGroupList {
+                    ForEach(Array(combined.enumerated()), id: \.element.id) { idx, task in
+                        let isOverdue = task.isOverdue(at: store.currentDateTime)
+                        dashboardTaskRow(task, isOverdue: isOverdue)
+                        if idx < combined.count - 1 {
+                            PLAInsetDivider(leadingInset: 52)
                         }
-                    }
-                    if store.todayTasks.count > 6 {
-                        Button("Lihat semua \(store.todayTasks.count) tugas hari ini") {
-                            selectedTab = .tasks
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(PLATokens.Colors.accent)
-                        .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
                     }
                 }
             }
         }
     }
 
-    // MARK: - Upcoming 7-Day Bills
+    // MARK: - Upcoming 7-Day Bills (Single Grouped Surface)
 
     private var upcomingBillsSection: some View {
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             PLASectionHeader(
-                title: "Tagihan 7 Hari Ke Depan",
+                title: "Tagihan 7 Hari",
                 actionTitle: "Keuangan",
                 action: { selectedTab = .finance }
             )
 
             if store.upcomingBills7Days.isEmpty {
-                PLACard(padding: PLATokens.Spacing.md) {
+                PLACard(padding: PLATokens.Spacing.lg) {
                     HStack(spacing: PLATokens.Spacing.md) {
-                        PLAIconBadge(systemName: "calendar.badge.checkmark", color: PLATokens.Colors.accent, size: 36)
+                        Image(systemName: "calendar.badge.checkmark")
+                            .font(.title3)
+                            .foregroundStyle(PLATokens.Colors.accent)
                         Text("Tidak ada tagihan jatuh tempo dalam 7 hari ke depan.")
                             .font(.subheadline)
                             .foregroundStyle(PLATokens.Colors.textSecondary)
                     }
                 }
             } else {
-                VStack(spacing: PLATokens.Spacing.sm) {
-                    ForEach(store.upcomingBills7Days) { bill in
-                        PLACard(padding: PLATokens.Spacing.md) {
-                            dashboardBillRow(bill)
+                PLAGroupList {
+                    ForEach(Array(store.upcomingBills7Days.enumerated()), id: \.element.id) { idx, bill in
+                        dashboardBillRow(bill)
+                        if idx < store.upcomingBills7Days.count - 1 {
+                            PLAInsetDivider(leadingInset: 48)
                         }
                     }
                 }
@@ -525,22 +354,23 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Insights & Personal Suggestions
+    // MARK: - Local Insights & Personal Suggestions (Shown Only When Present)
 
     @ViewBuilder
     private var insightsSection: some View {
         if !store.activeInsights.isEmpty {
             VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
                 PLASectionHeader(title: "Insight Keuangan")
-                VStack(spacing: PLATokens.Spacing.sm) {
-                    ForEach(store.activeInsights) { insight in
-                        PLACard(padding: PLATokens.Spacing.md) {
-                            InsightCardView(
-                                insight: insight,
-                                currentFeedback: store.feedbackForInsight(insight),
-                                onFeedback: { useful in store.rateInsight(insight, useful: useful) },
-                                onDismiss: { store.dismissInsight(insight) }
-                            )
+                PLAGroupList {
+                    ForEach(Array(store.activeInsights.enumerated()), id: \.element.id) { idx, insight in
+                        InsightCardView(
+                            insight: insight,
+                            currentFeedback: store.feedbackForInsight(insight),
+                            onFeedback: { useful in store.rateInsight(insight, useful: useful) },
+                            onDismiss: { store.dismissInsight(insight) }
+                        )
+                        if idx < store.activeInsights.count - 1 {
+                            PLAInsetDivider()
                         }
                     }
                 }
@@ -553,14 +383,15 @@ struct DashboardView: View {
         if !store.personalSuggestions.isEmpty {
             VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
                 PLASectionHeader(title: "Saran Kebiasaan Lokal")
-                VStack(spacing: PLATokens.Spacing.sm) {
-                    ForEach(store.personalSuggestions) { suggestion in
-                        PLACard(padding: PLATokens.Spacing.md) {
-                            PersonalSuggestionRow(
-                                suggestion: suggestion,
-                                onAccept: { store.acceptPersonalSuggestion(suggestion) },
-                                onDismiss: { store.dismissPersonalSuggestion(suggestion) }
-                            )
+                PLAGroupList {
+                    ForEach(Array(store.personalSuggestions.enumerated()), id: \.element.id) { idx, suggestion in
+                        PersonalSuggestionRow(
+                            suggestion: suggestion,
+                            onAccept: { store.acceptPersonalSuggestion(suggestion) },
+                            onDismiss: { store.dismissPersonalSuggestion(suggestion) }
+                        )
+                        if idx < store.personalSuggestions.count - 1 {
+                            PLAInsetDivider()
                         }
                     }
                 }
@@ -568,7 +399,7 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Row Builders
+    // MARK: - Clean Flat Row Builders
 
     private var hasAnyBanner: Bool {
         store.databaseErrorMessage != nil ||
@@ -580,108 +411,63 @@ struct DashboardView: View {
         store.settings.financeLockEnabled && !store.authService.isFinanceUnlocked
     }
 
-    private func dashboardOverdueTaskRow(_ task: PLATask) -> some View {
-        VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
-            HStack(alignment: .center, spacing: PLATokens.Spacing.sm) {
-                Button {
-                    store.completeTask(task)
-                } label: {
-                    Image(systemName: "circle")
-                        .font(.title3)
-                        .foregroundStyle(PLATokens.color(for: task.priority))
-                        .frame(minWidth: PLATokens.minTouchTarget, minHeight: PLATokens.minTouchTarget)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Selesaikan tugas \(task.title)")
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(task.title)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(PLATokens.Colors.textPrimary)
-                    if let notes = task.notes, !notes.isEmpty {
-                        Text(notes)
-                            .font(.caption)
-                            .foregroundStyle(PLATokens.Colors.textSecondary)
-                            .lineLimit(1)
-                    }
-                    if let due = task.dueDateLocal {
-                        Text(PLAFormatters.relativeDayLabel(due, today: store.today))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(PLATokens.Colors.danger)
-                    }
-                }
-                Spacer(minLength: PLATokens.Spacing.xs)
-            }
-
-            HStack {
-                Spacer()
-                Button {
-                    taskToReschedule = task
-                } label: {
-                    Label("Jadwalkan Ulang", systemImage: "calendar.badge.clock")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(PLATokens.Colors.accent)
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 36)
-                        .background(PLATokens.Colors.softBlueTint, in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-
-    private func dashboardTodayTaskRow(_ task: PLATask) -> some View {
-        let cat = store.categories.first { $0.id == task.categoryId }
-
-        return HStack(spacing: PLATokens.Spacing.sm) {
+    private func dashboardTaskRow(_ task: PLATask, isOverdue: Bool) -> some View {
+        HStack(alignment: .center, spacing: PLATokens.Spacing.sm) {
             Button {
                 store.completeTask(task)
             } label: {
                 Image(systemName: "circle")
                     .font(.title3)
-                    .foregroundStyle(PLATokens.color(for: task.priority))
-                    .frame(minWidth: PLATokens.minTouchTarget, minHeight: PLATokens.minTouchTarget)
+                    .foregroundStyle(isOverdue ? PLATokens.Colors.danger : PLATokens.color(for: task.priority))
+                    .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Tandai selesai \(task.title)")
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(task.title)
-                    .font(.body.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(PLATokens.Colors.textPrimary)
-                if let notes = task.notes, !notes.isEmpty {
-                    Text(notes)
-                        .font(.caption)
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                        .lineLimit(1)
-                }
-                HStack(spacing: PLATokens.Spacing.sm) {
-                    if let mins = task.dueTimeMinutes {
-                        Label(PLAFormatters.time24(mins), systemImage: "clock.fill")
+                    .lineLimit(2)
+
+                HStack(spacing: PLATokens.Spacing.xs) {
+                    if isOverdue, let due = task.dueDateLocal {
+                        Text(PLAFormatters.relativeDayLabel(due, today: store.today))
                             .font(.caption.weight(.semibold))
+                            .foregroundStyle(PLATokens.Colors.danger)
+                    } else if let mins = task.dueTimeMinutes {
+                        Text(PLAFormatters.time24(mins))
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
                             .foregroundStyle(PLATokens.Colors.accent)
                     }
-                    if let cat {
-                        Text(cat.name)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(PLATokens.Colors.softBlueText)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(PLATokens.Colors.softBlueTint, in: Capsule())
-                    }
-                    if task.recurrenceRuleId != nil {
-                        Image(systemName: "repeat")
-                            .font(.caption)
-                            .foregroundStyle(PLATokens.Colors.textSecondary)
-                            .accessibilityLabel("Tugas berulang")
-                    }
+
+                    Text(store.categoryName(for: task.categoryId))
+                        .font(.caption)
+                        .foregroundStyle(PLATokens.Colors.textSecondary)
                 }
             }
-            Spacer()
-            if task.priority == .high {
-                StatusBadge(text: "Tinggi", icon: PLATokens.icon(for: TaskPriority.high), color: PLATokens.Colors.danger)
+
+            Spacer(minLength: PLATokens.Spacing.xs)
+
+            if isOverdue {
+                Button("Jadwalkan") {
+                    taskToReschedule = task
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(PLATokens.Colors.accent)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 36)
+                .background(PLATokens.Colors.softBlueTint, in: Capsule())
+                .buttonStyle(.plain)
+            } else if task.priority == .high {
+                Image(systemName: PLATokens.icon(for: TaskPriority.high))
+                    .font(.subheadline)
+                    .foregroundStyle(PLATokens.Colors.danger)
+                    .accessibilityLabel("Prioritas tinggi")
             }
         }
+        .padding(.vertical, 6)
     }
 
     private func dashboardBillRow(_ bill: Bill) -> some View {
@@ -693,22 +479,15 @@ struct DashboardView: View {
                 PLAIconBadge(
                     systemName: bill.isTrial ? "hourglass" : "creditcard.fill",
                     color: tint,
-                    size: 36
+                    size: 34
                 )
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: PLATokens.Spacing.xs) {
-                        Text(bill.name)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(PLATokens.Colors.textPrimary)
-                        if bill.isTrial {
-                            StatusBadge(text: "Trial", icon: "hourglass", color: PLATokens.Colors.warning)
-                        } else if overdue {
-                            StatusBadge(text: "Terlewat", icon: "exclamationmark.triangle.fill", color: PLATokens.Colors.danger)
-                        }
-                    }
+                    Text(bill.name)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(PLATokens.Colors.textPrimary)
                     Text(bill.isTrial
                          ? "Trial berakhir \(PLAFormatters.shortDate(bill.effectiveDueOrTrialEndDate))"
-                         : "Jatuh tempo \(PLAFormatters.shortDate(bill.nextDueDateLocal))")
+                         : (overdue ? "Terlewat \(PLAFormatters.shortDate(bill.nextDueDateLocal))" : "Jatuh tempo \(PLAFormatters.shortDate(bill.nextDueDateLocal))"))
                         .font(.caption)
                         .foregroundStyle(overdue ? PLATokens.Colors.danger : PLATokens.Colors.textSecondary)
                 }
@@ -727,5 +506,6 @@ struct DashboardView: View {
                 .buttonStyle(.plain)
             }
         }
+        .padding(.vertical, PLATokens.Spacing.sm)
     }
 }

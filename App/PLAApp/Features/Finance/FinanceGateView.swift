@@ -2,8 +2,10 @@ import SwiftUI
 import PLACore
 
 /// Face ID / Touch ID + automatic Passcode fallback guard for the Finance tab (PRD F-12 / AC-12.1..12.3).
+/// Only prompts automatically when `isActive` becomes true so keeping tabs mounted never triggers Face ID on Beranda launch.
 struct FinanceGateView: View {
     @Environment(AppStore.self) private var store
+    var isActive: Bool = true
     @State private var hasAutoPromptedThisVisit = false
 
     private var isLocked: Bool {
@@ -67,20 +69,27 @@ struct FinanceGateView: View {
                     .background(PLATokens.Colors.canvas.ignoresSafeArea())
                     .toolbar(.hidden, for: .navigationBar)
                     .onAppear {
-                        if !hasAutoPromptedThisVisit {
-                            hasAutoPromptedThisVisit = true
-                            _Concurrency.Task {
-                                _ = await store.authService.unlockFinance()
-                            }
-                        }
+                        triggerAutoPromptIfNeeded()
                     }
-                    .onDisappear {
-                        hasAutoPromptedThisVisit = false
+                    .onChange(of: isActive) { _, active in
+                        if active {
+                            triggerAutoPromptIfNeeded()
+                        } else {
+                            hasAutoPromptedThisVisit = false
+                        }
                     }
                 }
             } else {
                 FinanceView()
             }
+        }
+    }
+
+    private func triggerAutoPromptIfNeeded() {
+        guard isActive, isLocked, !hasAutoPromptedThisVisit else { return }
+        hasAutoPromptedThisVisit = true
+        _Concurrency.Task {
+            _ = await store.authService.unlockFinance()
         }
     }
 }

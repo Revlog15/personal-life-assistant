@@ -1110,18 +1110,6 @@ final class AppStore {
         settingsStore.saveAppearanceMode(mode)
     }
 
-    func cycleAppearanceMode() {
-        switch appearanceMode {
-        case .system:
-            setAppearanceMode(.dark)
-        case .dark:
-            setAppearanceMode(.light)
-        case .light:
-            setAppearanceMode(.system)
-        }
-        showToast("Tema: \(appearanceMode.label)")
-    }
-
     /// Real local daily expense totals over the last `days` calendar days ending on `today`.
     func dailyExpenseSeries(days: Int) -> [PLADailyMetricPoint] {
         let count = max(days, 2)
