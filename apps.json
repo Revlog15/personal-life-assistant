@@ -19,6 +19,15 @@
       "screenshotURLs": [],
       "versions": [
         {
+          "version": "2.3.0",
+          "buildVersion": "19",
+          "date": "2026-11-27",
+          "localizedDescription": "feat(v2.3.0): White & Blue Liquid Glass UI redesign with Light/Dark mode, real telemetry chart, 7-day calendar timeline, and anti-slop polish",
+          "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.3.0/PLAApp-2.3.0.ipa",
+          "size": 3199498,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "2.2.0",
           "buildVersion": "17",
           "date": "2026-11-26",
@@ -64,7 +73,7 @@
           "minOSVersion": "17.0"
         }
       ],
-      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.2.0/PLAApp-2.2.0.ipa"
+      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.3.0/PLAApp-2.3.0.ipa"
     }
   ],
   "news": []
