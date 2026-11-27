@@ -3,7 +3,8 @@ import UIKit
 import UniformTypeIdentifiers
 import PLACore
 
-/// Settings tab covering Notifications & Sounds, Quiet Hours, Budget Cycle, Security, Backup/Export JSON/CSV, Diagnostics, and About (PRD §7.2, F-13, F-14).
+/// Settings tab covering Appearance (System/Light/Dark), Notifications & Sounds, Quiet Hours, Budget Cycle,
+/// Security, Backup/Export JSON/CSV, Diagnostics, and About (PRD §7.2, F-13, F-14).
 struct SettingsView: View {
     @Environment(AppStore.self) private var store
 
@@ -25,6 +26,35 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                // 0. Appearance Mode (Light White-Blue / Dark Midnight-Blue / System)
+                Section {
+                    VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+                        HStack(spacing: PLATokens.Spacing.md) {
+                            PLAIconBadge(systemName: store.appearanceMode.iconName, color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Tema Aplikasi")
+                                    .font(.subheadline.weight(.semibold))
+                                Text("Putih Biru (Terang) atau Gelap Otomatis")
+                                    .font(.caption)
+                                    .foregroundStyle(PLATokens.Colors.textSecondary)
+                            }
+                        }
+
+                        Picker("Mode Tampilan", selection: Binding(
+                            get: { store.appearanceMode },
+                            set: { store.setAppearanceMode($0) }
+                        )) {
+                            ForEach(AppAppearanceMode.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    .padding(.vertical, PLATokens.Spacing.xs)
+                } header: {
+                    Text("Tampilan")
+                }
+
                 // 1. Notifications & Smart Reminders
                 Section("Pengingat & Notifikasi") {
                     NavigationLink {
@@ -32,7 +62,7 @@ struct SettingsView: View {
                             .environment(store)
                     } label: {
                         HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: "bell.badge.fill", color: PLATokens.Colors.coral, size: 30, iconFont: .caption.weight(.bold))
+                            PLAIconBadge(systemName: "bell.badge.fill", color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
                             Text("Pola Smart Reminder & Suara")
                         }
                     }
@@ -42,7 +72,7 @@ struct SettingsView: View {
                         set: { val in store.updateSettings { $0.morningDigestEnabled = val } }
                     )) {
                         HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: "sun.horizon.fill", color: PLATokens.Colors.warning, size: 30, iconFont: .caption.weight(.bold))
+                            PLAIconBadge(systemName: "sun.horizon.fill", color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
                             Text("Ringkasan Pagi (07.30)")
                         }
                     }
@@ -52,8 +82,8 @@ struct SettingsView: View {
                         set: { val in store.updateSettings { $0.quietHoursEnabled = val } }
                     )) {
                         HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: "moon.zzz.fill", color: PLATokens.Colors.indigo, size: 30, iconFont: .caption.weight(.bold))
-                            Text("Jam Tenang (\(PLAFormatters.time24(store.settings.quietStartMinutes)) – \(PLAFormatters.time24(store.settings.quietEndMinutes)))")
+                            PLAIconBadge(systemName: "moon.zzz.fill", color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
+                            Text("Jam Tenang (\(PLAFormatters.time24(store.settings.quietStartMinutes)) - \(PLAFormatters.time24(store.settings.quietEndMinutes)))")
                         }
                     }
 
@@ -61,7 +91,7 @@ struct SettingsView: View {
                         FocusModeGuideView()
                     } label: {
                         HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: "moon.fill", color: PLATokens.Colors.violet, size: 30, iconFont: .caption.weight(.bold))
+                            PLAIconBadge(systemName: "moon.fill", color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
                             Text("Panduan Agar Tidak Terblokir Focus / DND")
                         }
                     }
@@ -70,7 +100,7 @@ struct SettingsView: View {
                         SiriAndShortcutsGuideView()
                     } label: {
                         HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: "mic.badge.plus", color: PLATokens.Colors.info, size: 30, iconFont: .caption.weight(.bold))
+                            PLAIconBadge(systemName: "mic.badge.plus", color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
                             Text("Siri Shortcuts & OCR Share Sheet")
                         }
                     }
@@ -89,7 +119,7 @@ struct SettingsView: View {
                         }
                     )) {
                         HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: "calendar", color: PLATokens.Colors.rose, size: 30, iconFont: .caption.weight(.bold))
+                            PLAIconBadge(systemName: "calendar", color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
                             Text("Pertimbangkan Apple Calendar saat Reschedule")
                         }
                     }
@@ -109,7 +139,7 @@ struct SettingsView: View {
                         Button {
                             store.notificationAdapter.openSystemSettings()
                         } label: {
-                            Label("Izin Notifikasi Ditolak — Buka Settings iOS", systemImage: "exclamationmark.triangle.fill")
+                            Label("Izin Notifikasi Ditolak: Buka Settings iOS", systemImage: "exclamationmark.triangle.fill")
                                 .foregroundStyle(PLATokens.Colors.warning)
                         }
                     } else if store.notificationAuthStatus == .notDetermined {
@@ -130,7 +160,7 @@ struct SettingsView: View {
                         HStack(spacing: PLATokens.Spacing.md) {
                             PLAIconBadge(systemName: "square.and.arrow.up.on.square.fill", color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
                             Text("Backup Lengkap (JSON)")
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(PLATokens.Colors.textPrimary)
                         }
                     }
 
@@ -140,7 +170,7 @@ struct SettingsView: View {
                         HStack(spacing: PLATokens.Spacing.md) {
                             PLAIconBadge(systemName: "arrow.counterclockwise.circle.fill", color: PLATokens.Colors.safe, size: 30, iconFont: .caption.weight(.bold))
                             Text("Pulihkan Backup (JSON)")
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(PLATokens.Colors.textPrimary)
                         }
                     }
 
@@ -148,9 +178,9 @@ struct SettingsView: View {
                         showCSVRangeSheet = true
                     } label: {
                         HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: "tablecells.fill", color: PLATokens.Colors.info, size: 30, iconFont: .caption.weight(.bold))
+                            PLAIconBadge(systemName: "tablecells.fill", color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
                             Text("Ekspor Transaksi (CSV)")
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(PLATokens.Colors.textPrimary)
                         }
                     }
                 } header: {
@@ -166,7 +196,7 @@ struct SettingsView: View {
                             .environment(store)
                     } label: {
                         HStack(spacing: PLATokens.Spacing.md) {
-                            PLAIconBadge(systemName: "stethoscope", color: PLATokens.Colors.warning, size: 30, iconFont: .caption.weight(.bold))
+                            PLAIconBadge(systemName: "stethoscope", color: PLATokens.Colors.accent, size: 30, iconFont: .caption.weight(.bold))
                             Text("Diagnostik, Sideload & Kirim Masukan")
                         }
                     }
@@ -177,6 +207,7 @@ struct SettingsView: View {
             }
             .scrollContentBackground(.hidden)
             .background(PLATokens.Colors.canvas)
+            .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
             .navigationTitle("Pengaturan")
             // JSON Backup FileExporter (AC-13.1)
             .fileExporter(
@@ -282,7 +313,7 @@ struct SettingsView: View {
                 let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
                 let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
                 Text("\(v) (Build \(b))")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PLATokens.Colors.textSecondary)
             }
 
             AdaptiveKeyValueRow {
@@ -290,7 +321,7 @@ struct SettingsView: View {
             } trailing: {
                 Text(store.sideloadInfo.summaryText(today: store.today))
                     .font(.footnote)
-                    .foregroundStyle(store.sideloadInfo.shouldShowBanner(on: store.today) ? PLATokens.Colors.warning : .secondary)
+                    .foregroundStyle(store.sideloadInfo.shouldShowBanner(on: store.today) ? PLATokens.Colors.warning : PLATokens.Colors.textSecondary)
                     .multilineTextAlignment(.trailing)
             }
 
@@ -445,7 +476,7 @@ struct NotificationSettingsDetailView: View {
 
     var body: some View {
         Form {
-            Section("Smart Reminder — Prioritas Tinggi") {
+            Section("Smart Reminder: Prioritas Tinggi") {
                 Toggle("H-7 (09.00)", isOn: prefBinding(\.highEnableH7))
                 Toggle("H-3 (09.00)", isOn: prefBinding(\.highEnableH3))
                 Toggle("H-1 (09.00)", isOn: prefBinding(\.highEnableH1))
@@ -453,14 +484,14 @@ struct NotificationSettingsDetailView: View {
                 Toggle("2 Jam Sebelum Deadline", isOn: prefBinding(\.highEnableTwoHoursBefore))
             }
 
-            Section("Smart Reminder — Prioritas Sedang & Rendah") {
+            Section("Smart Reminder: Prioritas Sedang & Rendah") {
                 Toggle("Sedang: H-3 (09.00)", isOn: prefBinding(\.mediumEnableH3))
                 Toggle("Sedang: H-1 (09.00)", isOn: prefBinding(\.mediumEnableH1))
                 Toggle("Sedang: Hari H (08.00)", isOn: prefBinding(\.mediumEnableDayOf))
                 Toggle("Rendah: Hari H (09.00)", isOn: prefBinding(\.lowEnableDayOf))
             }
 
-            Section("Smart Reminder — Tagihan") {
+            Section("Smart Reminder: Tagihan") {
                 Toggle("Tagihan: H-3 (09.00)", isOn: prefBinding(\.billEnableH3))
                 Toggle("Tagihan: H-1 (09.00)", isOn: prefBinding(\.billEnableH1))
                 Toggle("Tagihan: Hari H (08.00)", isOn: prefBinding(\.billEnableDayOf))
@@ -477,6 +508,7 @@ struct NotificationSettingsDetailView: View {
                 Text("Ketuk ikon speaker untuk mendengar pratinjau suara notifikasi. Perubahan pola Smart Reminder berlaku untuk tugas baru.")
             }
         }
+        .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
         .navigationTitle("Pengingat & Suara")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -518,13 +550,13 @@ struct FocusModeGuideView: View {
             Section {
                 Text("Karena PLA dipasang dengan sertifikat Apple ID gratis (tanpa entitlement Time Sensitive khusus), ikuti 3 langkah ini agar notifikasi penting tetap masuk saat mode Focus atau Do Not Disturb aktif:")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PLATokens.Colors.textSecondary)
             }
 
             Section("3 Langkah Mengizinkan PLA di Focus Mode") {
-                Label("1. Buka aplikasi Settings iPhone → pilih Focus.", systemImage: "1.circle.fill")
-                Label("2. Pilih mode Focus yang biasa dipakai (mis. Do Not Disturb atau Work) → ketuk Apps.", systemImage: "2.circle.fill")
-                Label("3. Pilih Allow Notifications From → ketuk Add → pilih Life Assistant.", systemImage: "3.circle.fill")
+                Label("1. Buka aplikasi Settings iPhone, lalu pilih Focus.", systemImage: "1.circle.fill")
+                Label("2. Pilih mode Focus yang biasa dipakai (mis. Do Not Disturb atau Work), lalu ketuk Apps.", systemImage: "2.circle.fill")
+                Label("3. Pilih Allow Notifications From, ketuk Add, lalu pilih Life Assistant.", systemImage: "3.circle.fill")
             }
 
             Section {
@@ -539,12 +571,13 @@ struct FocusModeGuideView: View {
                 .buttonStyle(.borderedProminent)
             }
         }
+        .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
         .navigationTitle("Panduan Focus Mode")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
 
-/// P-02 & P-05: Guide for Siri Shortcuts & Share Sheet OCR without needing a Share Extension (0 extra App IDs).
+/// P-02 & P-05: Guide for Siri Shortcuts & Share Sheet OCR.
 struct SiriAndShortcutsGuideView: View {
     var body: some View {
         Form {
@@ -555,19 +588,20 @@ struct SiriAndShortcutsGuideView: View {
             } header: {
                 Text("Siri & Action Button (App Intents)")
             } footer: {
-                Text("Siri akan memandu langkah demi langkah: kegiatan apa, dengan siapa/catatan, tanggal & jam, tingkat prioritas, dan kategori. Mendukung frasa Indonesia & Inggris.")
+                Text("Siri akan memandu langkah demi langkah: kegiatan apa, dengan siapa atau catatan, tanggal dan jam, tingkat prioritas, serta kategori. Mendukung frasa Indonesia dan Inggris.")
             }
 
             Section {
-                Label("1. Dari screenshot bukti transfer BCA/Mandiri/GoPay/OVO/DANA atau Photos, ketuk Share → pilih 'Catat ke Life Assistant'.", systemImage: "1.circle.fill")
+                Label("1. Dari screenshot bukti transfer BCA/Mandiri/GoPay/OVO/DANA atau Photos, ketuk Share lalu pilih 'Catat ke Life Assistant'.", systemImage: "1.circle.fill")
                 Label("2. Periksa hasil OCR offline lalu ketuk 'Simpan Draft & Buka Life Assistant'.", systemImage: "2.circle.fill")
-                Label("3. Alternatif 0-Extension (Shortcuts): buat Shortcut baru → aktifkan 'Show in Share Sheet' (Images) → tambahkan aksi 'Scan Struk ke Life Assistant'.", systemImage: "3.circle.fill")
+                Label("3. Alternatif 0-Extension (Shortcuts): buat Shortcut baru, aktifkan 'Show in Share Sheet' (Images), lalu tambahkan aksi 'Scan Struk ke Life Assistant'.", systemImage: "3.circle.fill")
             } header: {
                 Text("Share Extension Native & Shortcut OCR")
             } footer: {
                 Text("Semua pemrosesan OCR memakai Apple Vision secara offline di memori dan foto tidak pernah disimpan di aplikasi.")
             }
         }
+        .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
         .navigationTitle("Siri & Shortcuts")
         .navigationBarTitleDisplayMode(.inline)
     }

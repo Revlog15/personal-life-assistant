@@ -163,7 +163,7 @@ final class ShareViewController: UIViewController {
                         self?.extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
                     } else if savedToAppGroup {
                         self?.viewModel.markSavedWaitingForManualOpen(
-                            "Draft struk sudah tersimpan aman! Buka aplikasi Life Assistant sekarang — layar tinjau transaksi akan langsung muncul otomatis."
+                            "Draft struk sudah tersimpan aman. Buka aplikasi Life Assistant sekarang, layar tinjau transaksi akan langsung muncul otomatis."
                         )
                     } else {
                         self?.viewModel.markSavedWaitingForManualOpen(
@@ -270,7 +270,7 @@ private struct ShareOCRReviewView: View {
     let onCancel: () -> Void
 
     @Environment(\.openURL) private var openURL
-    private let brandTeal = Color(red: 0.06, green: 0.46, blue: 0.43)
+    private let brandBlue = Color(red: 0.145, green: 0.388, blue: 0.922) // #2563EB Royal Blue
 
     var body: some View {
         NavigationStack {
@@ -280,11 +280,11 @@ private struct ShareOCRReviewView: View {
                     VStack(spacing: 16) {
                         ZStack {
                             Circle()
-                                .fill(brandTeal.opacity(0.14))
+                                .fill(brandBlue.opacity(0.14))
                                 .frame(width: 72, height: 72)
                             ProgressView()
                                 .controlSize(.large)
-                                .tint(brandTeal)
+                                .tint(brandBlue)
                         }
                         Text("Membaca struk secara offline...")
                             .font(.headline)
@@ -315,7 +315,7 @@ private struct ShareOCRReviewView: View {
                             .padding(.horizontal)
                         Button("Selesai", action: onDone)
                             .buttonStyle(.borderedProminent)
-                            .tint(brandTeal)
+                            .tint(brandBlue)
                             .frame(minHeight: 44)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -339,7 +339,7 @@ private struct ShareOCRReviewView: View {
                             .padding(.horizontal)
                         Button("Tutup", action: onCancel)
                             .buttonStyle(.borderedProminent)
-                            .tint(brandTeal)
+                            .tint(brandBlue)
                             .frame(minHeight: 44)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -357,8 +357,8 @@ private struct ShareOCRReviewView: View {
                                         .font(.caption.weight(.semibold))
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
-                                        .background(brandTeal.opacity(0.15))
-                                        .foregroundStyle(brandTeal)
+                                        .background(brandBlue.opacity(0.15))
+                                        .foregroundStyle(brandBlue)
                                         .clipShape(Capsule())
                                 }
                             }
@@ -366,10 +366,10 @@ private struct ShareOCRReviewView: View {
                             HStack(spacing: 8) {
                                 Text("Rp")
                                     .font(.headline)
-                                    .foregroundStyle(brandTeal)
+                                    .foregroundStyle(brandBlue)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(brandTeal.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                    .background(brandBlue.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                                 TextField("Contoh: 45.000", text: $viewModel.amountText)
                                     .font(.title3.weight(.bold))
                                     .monospacedDigit()
@@ -416,7 +416,7 @@ private struct ShareOCRReviewView: View {
                                 .frame(minHeight: 46)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(brandTeal)
+                            .tint(brandBlue)
                             .listRowBackground(Color.clear)
                             .listRowInsets(EdgeInsets())
                         }

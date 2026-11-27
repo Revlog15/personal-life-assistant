@@ -72,7 +72,7 @@ struct PLATimelineProvider: TimelineProvider {
 // MARK: - Widget Formatters (Self-Contained, Zero UIKit/GRDB)
 
 private enum PLAWidgetFormat {
-    static let accent = Color(red: 0.06, green: 0.46, blue: 0.43)
+    static let accent = Color(red: 0.145, green: 0.388, blue: 0.922) // #2563EB Royal Blue
 
     static func rupiah(_ amount: Int64) -> String {
         let isNegative = amount < 0

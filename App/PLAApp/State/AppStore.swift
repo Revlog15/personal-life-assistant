@@ -32,6 +32,7 @@ final class AppStore {
     var settings: UserSettings
 
     // System & UI state
+    var appearanceMode: AppAppearanceMode = .system
     var notificationAuthStatus: UNAuthorizationStatus = .notDetermined
     var pendingNotificationCount: Int = 0
     var sideloadInfo: SideloadExpiryInfo
@@ -66,6 +67,7 @@ final class AppStore {
         )
         let loadedSettings = settingsStore.loadSettings()
         self.settings = loadedSettings
+        self.appearanceMode = settingsStore.loadAppearanceMode()
         self.sideloadInfo = SideloadExpiryReader.read(
             manualRefreshDate: settingsStore.loadManualSideloadRefreshDate(),
             timeZone: clock.timeZone
@@ -997,7 +999,7 @@ final class AppStore {
             queue: .main
         ) { [weak self] _ in
             _Concurrency.Task { @MainActor in
-                self?.diagnostics.log(category: "Clock", message: "Zona waktu berubah — menyusun ulang antrean notifikasi")
+                self?.diagnostics.log(category: "Clock", message: "Zona waktu berubah: menyusun ulang antrean notifikasi")
                 self?.refreshSystemStatusAndSyncNotifications()
             }
         }
@@ -1007,7 +1009,7 @@ final class AppStore {
             queue: .main
         ) { [weak self] _ in
             _Concurrency.Task { @MainActor in
-                self?.diagnostics.log(category: "Clock", message: "Jam perangkat berubah — menyusun ulang antrean notifikasi")
+                self?.diagnostics.log(category: "Clock", message: "Jam perangkat berubah: menyusun ulang antrean notifikasi")
                 self?.refreshSystemStatusAndSyncNotifications()
             }
         }
@@ -1100,4 +1102,153 @@ final class AppStore {
         guard settings.useCalendarForReschedule else { return [:] }
         return calendarService.eventCountsForNext7Days(from: today, timeZone: clock.timeZone)
     }
+
+    // MARK: - Appearance & Real-Data UI Telemetry
+
+    func setAppearanceMode(_ mode: AppAppearanceMode) {
+        appearanceMode = mode
+        settingsStore.saveAppearanceMode(mode)
+    }
+
+    func cycleAppearanceMode() {
+        switch appearanceMode {
+        case .system:
+            setAppearanceMode(.dark)
+        case .dark:
+            setAppearanceMode(.light)
+        case .light:
+            setAppearanceMode(.system)
+        }
+        showToast("Tema: \(appearanceMode.label)")
+    }
+
+    /// Real local daily expense totals over the last `days` calendar days ending on `today`.
+    func dailyExpenseSeries(days: Int) -> [PLADailyMetricPoint] {
+        let count = max(days, 2)
+        let start = today.addingDays(-(count - 1))
+        var totalsByDate: [LocalDate: Int64] = [:]
+        for tx in transactions where tx.type == .expense && tx.dateLocal >= start && tx.dateLocal <= today {
+            totalsByDate[tx.dateLocal, default: 0] += tx.amount
+        }
+        return (0..<count).map { offset in
+            let date = start.addingDays(offset)
+            let axisLabel: String
+            if count <= 7 {
+                axisLabel = PLAFormatters.shortWeekday(date.weekdayISO)
+            } else {
+                axisLabel = "\(date.day)"
+            }
+            return PLADailyMetricPoint(
+                date: date,
+                axisLabel: axisLabel,
+                amount: totalsByDate[date] ?? 0,
+                isToday: date == today
+            )
+        }
+    }
+
+    /// Real local daily expense totals from the start of the active budget cycle up to `today`.
+    func cycleDailyExpenseSeries() -> [PLADailyMetricPoint] {
+        let period = activePeriod
+        let spanDays = max(1, period.start.days(until: today) + 1)
+        let effectiveCount = min(spanDays, 31)
+        let start = today.addingDays(-(effectiveCount - 1))
+        var totalsByDate: [LocalDate: Int64] = [:]
+        for tx in transactions where tx.type == .expense && tx.dateLocal >= start && tx.dateLocal <= today {
+            totalsByDate[tx.dateLocal, default: 0] += tx.amount
+        }
+        return (0..<effectiveCount).map { offset in
+            let date = start.addingDays(offset)
+            return PLADailyMetricPoint(
+                date: date,
+                axisLabel: "\(date.day)",
+                amount: totalsByDate[date] ?? 0,
+                isToday: date == today
+            )
+        }
+    }
+
+    /// Real 7-day task completion breakdown for the expandable Overview ring card.
+    func last7DaysTaskProgress() -> (points: [PLADailyRingPoint], completedDays: Int, scheduledDays: Int) {
+        let start = today.addingDays(-6)
+        var points: [PLADailyRingPoint] = []
+        var completedDays = 0
+        var scheduledDays = 0
+
+        for offset in 0..<7 {
+            let date = start.addingDays(offset)
+            let dayTasks = tasks.filter { task in
+                if task.dueDateLocal == date { return true }
+                if task.status == .completed,
+                   let doneAt = task.completedAt,
+                   LocalDate.from(date: doneAt, timeZone: clock.timeZone) == date {
+                    return true
+                }
+                return false
+            }
+            let total = dayTasks.count
+            let done = dayTasks.filter { $0.status == .completed }.count
+            let progress: Double = total > 0 ? Double(done) / Double(total) : 0
+            if total > 0 {
+                scheduledDays += 1
+                if done == total {
+                    completedDays += 1
+                }
+            }
+            points.append(PLADailyRingPoint(
+                date: date,
+                letter: PLAFormatters.singleLetterWeekday(date.weekdayISO),
+                completedCount: done,
+                totalCount: total,
+                progress: progress,
+                isToday: date == today
+            ))
+        }
+        return (points, completedDays, scheduledDays)
+    }
+
+    /// Tasks due on a specific local date, ordered chronologically by time-of-day then priority.
+    func tasksScheduled(on date: LocalDate) -> [PLATask] {
+        tasks
+            .filter { $0.dueDateLocal == date }
+            .sorted { lhs, rhs in
+                if lhs.status != rhs.status {
+                    return lhs.status == .active
+                }
+                let lTime = lhs.dueTimeMinutes ?? Int.max
+                let rTime = rhs.dueTimeMinutes ?? Int.max
+                if lTime != rTime { return lTime < rTime }
+                return lhs.priority.rawValue > rhs.priority.rawValue
+            }
+    }
+
+    /// Set of dates inside a given 7-day slice that have at least one active task scheduled.
+    func datesWithActiveTasks(in dates: [LocalDate]) -> Set<LocalDate> {
+        let set = Set(dates)
+        var result: Set<LocalDate> = []
+        for task in tasks where task.status == .active {
+            if let due = task.dueDateLocal, set.contains(due) {
+                result.insert(due)
+            }
+        }
+        return result
+    }
+}
+
+struct PLADailyMetricPoint: Identifiable, Hashable {
+    var id: String { date.isoString }
+    let date: LocalDate
+    let axisLabel: String
+    let amount: Int64
+    let isToday: Bool
+}
+
+struct PLADailyRingPoint: Identifiable, Hashable {
+    var id: String { date.isoString }
+    let date: LocalDate
+    let letter: String
+    let completedCount: Int
+    let totalCount: Int
+    let progress: Double
+    let isToday: Bool
 }

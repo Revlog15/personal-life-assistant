@@ -1,7 +1,7 @@
 import SwiftUI
 import PLACore
 
-/// 3-step skippable onboarding (PRD F-15 / AC-15.1 & AC-15.2) with vibrant step headers & dot-formatted Rupiah inputs.
+/// 3-step skippable onboarding (PRD F-15 / AC-15.1 & AC-15.2) in cohesive White & Blue with dot-formatted Rupiah inputs.
 struct OnboardingView: View {
     @Environment(AppStore.self) private var store
 
@@ -11,19 +11,11 @@ struct OnboardingView: View {
     @State private var budgetText: String = ""
     @State private var notificationRequested: Bool = false
 
-    private var stepAccent: Color {
-        switch step {
-        case 0: return PLATokens.Colors.accent
-        case 1: return PLATokens.Colors.violet
-        default: return PLATokens.Colors.indigo
-        }
-    }
-
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 ProgressView(value: Double(step + 1), total: 3.0)
-                    .tint(stepAccent)
+                    .tint(PLATokens.Colors.primaryBlue)
                     .padding(.horizontal, PLATokens.Spacing.lg)
                     .padding(.top, PLATokens.Spacing.sm)
 
@@ -56,26 +48,20 @@ struct OnboardingView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: PLATokens.Spacing.sm) {
-                    Button {
+                    PLAPrimaryPillButton(title: step < 2 ? "Lanjut" : "Mulai Gunakan PLA") {
                         if step < 2 {
                             step += 1
                         } else {
                             finishOnboarding()
                         }
-                    } label: {
-                        Text(step < 2 ? "Lanjut" : "Mulai Gunakan PLA")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(stepAccent)
 
                     if step == 0 {
                         Button("Lewati Semua Pengaturan Awal") {
                             store.skipOnboarding()
                         }
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .font(.footnote.weight(.medium))
+                        .foregroundStyle(PLATokens.Colors.textSecondary)
                         .frame(minHeight: PLATokens.minTouchTarget)
                     }
                 }
@@ -111,7 +97,7 @@ struct OnboardingView: View {
                         Text("100% Privat & Offline")
                             .font(.headline)
                             .foregroundStyle(Color.white)
-                        Text("Semua data disimpan lokal di iPhone Anda — tanpa akun, tanpa server.")
+                        Text("Semua data disimpan lokal di iPhone Anda, tanpa akun dan tanpa server.")
                             .font(.footnote)
                             .foregroundStyle(Color.white.opacity(0.86))
                     }
@@ -124,7 +110,7 @@ struct OnboardingView: View {
         Section {
             VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                 HStack(spacing: PLATokens.Spacing.sm) {
-                    PLAIconBadge(systemName: "banknote.fill", color: PLATokens.Colors.safe, size: 28, iconFont: .caption.weight(.bold))
+                    PLAIconBadge(systemName: "banknote.fill", color: PLATokens.Colors.accent, size: 28, iconFont: .caption.weight(.bold))
                     Text("Tunai")
                         .font(.subheadline.weight(.semibold))
                 }
@@ -132,12 +118,12 @@ struct OnboardingView: View {
                     placeholder: "Contoh: 250.000",
                     text: $cashText,
                     font: .body.weight(.semibold),
-                    accentColor: PLATokens.Colors.safe
+                    accentColor: PLATokens.Colors.accent
                 )
             }
             VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
                 HStack(spacing: PLATokens.Spacing.sm) {
-                    PLAIconBadge(systemName: "building.columns.fill", color: PLATokens.Colors.info, size: 28, iconFont: .caption.weight(.bold))
+                    PLAIconBadge(systemName: "building.columns.fill", color: PLATokens.Colors.accent, size: 28, iconFont: .caption.weight(.bold))
                     Text("Bank")
                         .font(.subheadline.weight(.semibold))
                 }
@@ -145,7 +131,7 @@ struct OnboardingView: View {
                     placeholder: "Contoh: 2.500.000",
                     text: $bankText,
                     font: .body.weight(.semibold),
-                    accentColor: PLATokens.Colors.info
+                    accentColor: PLATokens.Colors.accent
                 )
             }
         } header: {
@@ -158,7 +144,7 @@ struct OnboardingView: View {
     @ViewBuilder
     private var stepBudget: some View {
         Section {
-            PLAHeroCard(gradient: PLATokens.savingsGradient) {
+            PLAHeroCard(gradient: PLATokens.heroGradient) {
                 HStack(spacing: PLATokens.Spacing.md) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -172,7 +158,7 @@ struct OnboardingView: View {
                         Text("Kontrol Belanja Otomatis")
                             .font(.headline)
                             .foregroundStyle(Color.white)
-                        Text("PLA menghitung batas aman harian & proyeksi akhir bulan secara deterministik.")
+                        Text("PLA menghitung batas aman harian dan proyeksi akhir bulan secara deterministik.")
                             .font(.footnote)
                             .foregroundStyle(Color.white.opacity(0.86))
                     }
@@ -187,17 +173,17 @@ struct OnboardingView: View {
                 placeholder: "Contoh: 3.000.000",
                 text: $budgetText,
                 font: .title3.weight(.bold),
-                accentColor: PLATokens.Colors.violet
+                accentColor: PLATokens.Colors.accent
             )
             if let parsed = parseOptionalPositiveAmount(budgetText) {
                 Text("Batas bulanan: \(PLAFormatters.rupiah(parsed))")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(PLATokens.Colors.violet)
+                    .foregroundStyle(PLATokens.Colors.accent)
             }
         } header: {
             Text("Batas Anggaran Total (Opsional)")
         } footer: {
-            Text("Siklus default dimulai tanggal 1 setiap bulan. Anda dapat mengubah ke tanggal gajian (1–28) di Pengaturan.")
+            Text("Siklus default dimulai tanggal 1 setiap bulan. Anda dapat mengubah ke tanggal gajian (1-28) di Pengaturan.")
         }
     }
 
@@ -206,18 +192,18 @@ struct OnboardingView: View {
         Section {
             VStack(alignment: .leading, spacing: PLATokens.Spacing.md) {
                 HStack(spacing: PLATokens.Spacing.md) {
-                    PLAIconBadge(systemName: "bell.badge.fill", color: PLATokens.Colors.indigo, size: 46, iconFont: .title3.weight(.semibold))
+                    PLAIconBadge(systemName: "bell.badge.fill", color: PLATokens.Colors.accent, size: 46, iconFont: .title3.weight(.semibold))
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Smart Reminder & Tagihan")
                             .font(.headline)
                         Text("Pengingat H-7, H-3, H-1 hingga Hari H otomatis.")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
                     }
                 }
-                Text("Jam tenang aktif pukul 22.00 – 07.00 sehingga notifikasi otomatis tidak mengganggu waktu istirahat.")
+                Text("Jam tenang aktif pukul 22.00 - 07.00 sehingga notifikasi otomatis tidak mengganggu waktu istirahat.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PLATokens.Colors.textSecondary)
             }
             .padding(.vertical, PLATokens.Spacing.xs)
         }
@@ -236,7 +222,7 @@ struct OnboardingView: View {
                 .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
             }
             .buttonStyle(.borderedProminent)
-            .tint(notificationRequested ? PLATokens.Colors.safe : PLATokens.Colors.indigo)
+            .tint(notificationRequested ? PLATokens.Colors.safe : PLATokens.Colors.primaryBlue)
             .disabled(notificationRequested)
         } footer: {
             Text("Anda tetap dapat menggunakan seluruh aplikasi walau menunda izin notifikasi.")

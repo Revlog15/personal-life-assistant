@@ -16,6 +16,7 @@ struct PLAApp: App {
         WindowGroup {
             RootTabView()
                 .environment(store)
+                .preferredColorScheme(store.appearanceMode.colorScheme)
                 .onOpenURL { url in
                     store.handleIncomingURL(url)
                 }

@@ -2,7 +2,7 @@ import SwiftUI
 import PLACore
 
 /// Quick & Smart Reschedule sheet (MVP F-06 + Pasca-MVP P-08 R-PER-03 weighted daily score & read-only EventKit).
-/// Never mutates the schedule automatically — requires explicit user confirmation.
+/// Never mutates the schedule automatically; requires explicit user confirmation.
 struct RescheduleSheet: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -60,7 +60,7 @@ struct RescheduleSheet: View {
                             select(option.date)
                         } label: {
                             HStack(spacing: PLATokens.Spacing.md) {
-                                Image(systemName: option.id == bestOption.id ? "sparkles" : "calendar")
+                                Image(systemName: option.id == bestOption.id ? "checkmark.circle.fill" : "calendar")
                                     .font(.title3)
                                     .foregroundStyle(option.id == bestOption.id ? PLATokens.Colors.accent : .secondary)
 

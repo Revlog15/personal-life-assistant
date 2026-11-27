@@ -2,7 +2,8 @@ import SwiftUI
 import UIKit
 import PLACore
 
-/// Unified design system tokens (4-pt grid, vivid domain palette, Light/Dark explicitly composed, WCAG AA contrast).
+/// Unified White & Blue design system tokens with explicit Light/Dark palettes and WCAG AA verified contrast.
+/// Liquid Glass chrome is restricted to floating overlays (bottom tab dock and transient banners) to maintain visual hierarchy.
 enum PLATokens {
     enum Spacing {
         static let xs: CGFloat = 4
@@ -10,18 +11,21 @@ enum PLATokens {
         static let md: CGFloat = 12
         static let lg: CGFloat = 16
         static let xl: CGFloat = 24
+        static let xxl: CGFloat = 32
     }
 
+    /// Deliberate 3-step radius hierarchy: 12pt controls/inputs, 20pt content cards, 24pt telemetry hero.
     enum Radius {
         static let sm: CGFloat = 10
-        static let md: CGFloat = 14
-        static let lg: CGFloat = 18
-        static let xl: CGFloat = 22
+        static let md: CGFloat = 12
+        static let lg: CGFloat = 20
+        static let xl: CGFloat = 24
     }
 
     static let minTouchTarget: CGFloat = 44
+    /// Reserved bottom padding so ScrollViews always clear the detached floating Liquid Glass tab dock.
+    static let floatingDockClearance: CGFloat = 112
 
-    /// Explicitly composed Light & Dark adaptive dynamic color helper.
     private static func adaptive(light: UIColor, dark: UIColor) -> Color {
         Color(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark ? dark : light
@@ -29,73 +33,109 @@ enum PLATokens {
     }
 
     enum Colors {
-        // Brand anchor: Deep Emerald-Teal
-        static let accent = adaptive(
-            light: UIColor(red: 0.059, green: 0.463, blue: 0.431, alpha: 1),  // #0F766E
-            dark: UIColor(red: 0.176, green: 0.831, blue: 0.749, alpha: 1)    // #2DD4BF
-        )
-
-        // Composed Light & Dark surfaces (tinted cool-mint light canvas, rich deep slate dark)
+        // Core neutral ground and card surfaces (White & Blue Light Mode / Midnight Slate Dark Mode)
         static let canvas = adaptive(
-            light: UIColor(red: 0.949, green: 0.969, blue: 0.965, alpha: 1),  // #F2F7F6
-            dark: UIColor(red: 0.047, green: 0.063, blue: 0.075, alpha: 1)    // #0C1013
+            light: UIColor(red: 0.961, green: 0.969, blue: 0.984, alpha: 1),  // #F5F7FB Porcelain White
+            dark: UIColor(red: 0.027, green: 0.043, blue: 0.078, alpha: 1)    // #070B14 Midnight Obsidian
         )
         static let surface = adaptive(
-            light: UIColor.white,
-            dark: UIColor(red: 0.086, green: 0.110, blue: 0.129, alpha: 1)    // #161C21
+            light: UIColor.white,                                             // #FFFFFF Pure White
+            dark: UIColor(red: 0.067, green: 0.094, blue: 0.153, alpha: 1)    // #111827 Deep Slate
+        )
+        static let elevatedSurface = adaptive(
+            light: UIColor(red: 0.973, green: 0.980, blue: 0.988, alpha: 1),  // #F8FAFC
+            dark: UIColor(red: 0.090, green: 0.125, blue: 0.200, alpha: 1)    // #172033
         )
         static let groupedBackground = canvas
 
-        // Semantic & domain accents (WCAG AA on Light & Dark)
-        static let safe = adaptive(
-            light: UIColor(red: 0.020, green: 0.588, blue: 0.412, alpha: 1),    // #059669 Emerald
-            dark: UIColor(red: 0.204, green: 0.827, blue: 0.600, alpha: 1)    // #34D399
+        // Crisp hairline borders and interactive input borders (WCAG 1.4.11 verified)
+        static let border = adaptive(
+            light: UIColor(red: 0.886, green: 0.910, blue: 0.941, alpha: 1),  // #E2E8F0
+            dark: UIColor(red: 0.122, green: 0.165, blue: 0.251, alpha: 1)    // #1F2A40
         )
-        static let warning = adaptive(
-            light: UIColor(red: 0.851, green: 0.467, blue: 0.024, alpha: 1),  // #D97706 Amber
-            dark: UIColor(red: 0.984, green: 0.749, blue: 0.141, alpha: 1)    // #FBBF24
-        )
-        static let coral = adaptive(
-            light: UIColor(red: 0.918, green: 0.345, blue: 0.047, alpha: 1),  // #EA580C Coral-Orange
-            dark: UIColor(red: 0.984, green: 0.573, blue: 0.235, alpha: 1)    // #FB923C
-        )
-        static let danger = adaptive(
-            light: UIColor(red: 0.863, green: 0.149, blue: 0.149, alpha: 1),  // #DC2626 Crimson
-            dark: UIColor(red: 0.973, green: 0.443, blue: 0.443, alpha: 1)    // #F87171
-        )
-        static let info = adaptive(
-            light: UIColor(red: 0.008, green: 0.518, blue: 0.780, alpha: 1),  // #0284C7 Sky Blue
-            dark: UIColor(red: 0.220, green: 0.741, blue: 0.973, alpha: 1)    // #38BDF8
-        )
-        static let indigo = adaptive(
-            light: UIColor(red: 0.263, green: 0.322, blue: 0.878, alpha: 1),  // #4352E0 Cobalt Indigo (Tasks)
-            dark: UIColor(red: 0.506, green: 0.549, blue: 0.973, alpha: 1)    // #818CF8
-        )
-        static let violet = adaptive(
-            light: UIColor(red: 0.486, green: 0.227, blue: 0.929, alpha: 1),  // #7C3AED Violet (Savings & What-If)
-            dark: UIColor(red: 0.655, green: 0.545, blue: 0.980, alpha: 1)    // #A78BFA
-        )
-        static let rose = adaptive(
-            light: UIColor(red: 0.859, green: 0.153, blue: 0.467, alpha: 1),  // #DB2777 Rose (Bills & Trials)
-            dark: UIColor(red: 0.957, green: 0.447, blue: 0.714, alpha: 1)    // #F472B6
+        static let inputBorder = adaptive(
+            light: UIColor(red: 0.392, green: 0.455, blue: 0.545, alpha: 1),  // #64748B (4.76:1 on white)
+            dark: UIColor(red: 0.392, green: 0.455, blue: 0.545, alpha: 1)    // #64748B (3.73:1 on #111827)
         )
 
-        // Hero surface endpoints (explicitly deeper in Dark Mode so white text stays crisp)
+        // Typography inks (WCAG AA verified >= 6.3:1)
+        static let textPrimary = adaptive(
+            light: UIColor(red: 0.059, green: 0.090, blue: 0.165, alpha: 1),  // #0F172A (17.85:1 on white)
+            dark: UIColor(red: 0.973, green: 0.980, blue: 0.988, alpha: 1)    // #F8FAFC (16.96:1 on dark surface)
+        )
+        static let textSecondary = adaptive(
+            light: UIColor(red: 0.278, green: 0.333, blue: 0.412, alpha: 1),  // #475569 (7.58:1 on white)
+            dark: UIColor(red: 0.580, green: 0.639, blue: 0.722, alpha: 1)    // #94A3B8 (6.92:1 on dark surface)
+        )
+
+        // Single deliberate primary accent: Royal Cobalt Blue
+        static let accent = adaptive(
+            light: UIColor(red: 0.114, green: 0.306, blue: 0.847, alpha: 1),  // #1D4ED8 (6.70:1 on white)
+            dark: UIColor(red: 0.376, green: 0.647, blue: 0.980, alpha: 1)    // #60A5FA (6.98:1 on #111827)
+        )
+        /// Solid Royal Blue fill for primary CTA buttons and active dock pill (#FFFFFF text = 5.17:1).
+        static let primaryBlue = Color(red: 0.145, green: 0.388, blue: 0.922) // #2563EB
+        /// Soft ice-blue selection capsule surface (active calendar day & subtle highlight tint).
+        static let softBlueTint = adaptive(
+            light: UIColor(red: 0.937, green: 0.965, blue: 1.000, alpha: 1),  // #EFF6FF
+            dark: UIColor(red: 0.090, green: 0.145, blue: 0.329, alpha: 1)    // #172554
+        )
+        static let softBlueText = adaptive(
+            light: UIColor(red: 0.114, green: 0.306, blue: 0.847, alpha: 1),  // #1D4ED8 (6.16:1 on #EFF6FF)
+            dark: UIColor(red: 0.576, green: 0.773, blue: 0.992, alpha: 1)    // #93C5FD (8.15:1 on #172554)
+        )
+
+        // Signature Dark Contrast Telemetry Card (echoing reference's obsidian chart anchor)
+        static let obsidianCard = adaptive(
+            light: UIColor(red: 0.043, green: 0.067, blue: 0.125, alpha: 1),  // #0B1120
+            dark: UIColor(red: 0.055, green: 0.086, blue: 0.161, alpha: 1)    // #0E1629
+        )
+        static let obsidianBorder = adaptive(
+            light: UIColor(red: 0.118, green: 0.161, blue: 0.231, alpha: 1),  // #1E293B
+            dark: UIColor(red: 0.141, green: 0.196, blue: 0.302, alpha: 1)    // #24324D
+        )
+        static let obsidianMutedText = Color(red: 0.580, green: 0.639, blue: 0.722) // #94A3B8 (7.34:1 on #0B1120)
+        static let chartLine = Color(red: 0.376, green: 0.647, blue: 0.980)         // #60A5FA (7.41:1 on #0B1120)
+        static let chartLineDeep = Color(red: 0.231, green: 0.510, blue: 0.965)     // #3B82F6 (5.12:1 on #0B1120)
+
+        // Liquid Glass dock tones (applied strictly to floating navigation dock & toast)
+        static let glassTint = adaptive(
+            light: UIColor(red: 0.945, green: 0.965, blue: 0.996, alpha: 0.76),
+            dark: UIColor(red: 0.051, green: 0.082, blue: 0.149, alpha: 0.78)
+        )
+        static let glassInactiveIcon = adaptive(
+            light: UIColor(red: 0.200, green: 0.255, blue: 0.333, alpha: 1),  // #334155 (8.95:1 on frosted white)
+            dark: UIColor(red: 0.580, green: 0.639, blue: 0.722, alpha: 1)    // #94A3B8 (7.11:1 on obsidian glass)
+        )
+
+        // Semantic status colors (used strictly to communicate state, never decorative sprawl)
+        static let safe = adaptive(
+            light: UIColor(red: 0.082, green: 0.502, blue: 0.239, alpha: 1),  // #15803D (5.02:1 on white)
+            dark: UIColor(red: 0.204, green: 0.827, blue: 0.600, alpha: 1)    // #34D399 (9.23:1 on #111827)
+        )
+        static let warning = adaptive(
+            light: UIColor(red: 0.706, green: 0.325, blue: 0.035, alpha: 1),  // #B45309 (5.02:1 on white)
+            dark: UIColor(red: 0.984, green: 0.749, blue: 0.141, alpha: 1)    // #FBBF24 (10.63:1 on #111827)
+        )
+        static let danger = adaptive(
+            light: UIColor(red: 0.863, green: 0.149, blue: 0.149, alpha: 1),  // #DC2626 (4.83:1 on white)
+            dark: UIColor(red: 0.973, green: 0.443, blue: 0.443, alpha: 1)    // #F87171 (6.41:1 on #111827)
+        )
+
+        // Cohesive aliases mapping legacy domain tokens into the restrained White & Blue + semantic system
+        static let info = accent
+        static let indigo = accent
+        static let violet = accent
+        static let coral = danger
+        static let rose = accent
+
         static let heroStart = adaptive(
-            light: UIColor(red: 0.047, green: 0.400, blue: 0.376, alpha: 1),  // #0C6660
-            dark: UIColor(red: 0.043, green: 0.306, blue: 0.290, alpha: 1)    // #0B4E4A
+            light: UIColor(red: 0.067, green: 0.165, blue: 0.420, alpha: 1),  // #112A6B Deep Cobalt
+            dark: UIColor(red: 0.055, green: 0.118, blue: 0.275, alpha: 1)    // #0E1E46
         )
         static let heroEnd = adaptive(
-            light: UIColor(red: 0.059, green: 0.569, blue: 0.518, alpha: 1),  // #0F9184
-            dark: UIColor(red: 0.059, green: 0.439, blue: 0.408, alpha: 1)    // #0F7068
-        )
-        static let violetStart = adaptive(
-            light: UIColor(red: 0.357, green: 0.129, blue: 0.714, alpha: 1),  // #5B21B6
-            dark: UIColor(red: 0.263, green: 0.098, blue: 0.529, alpha: 1)
-        )
-        static let violetEnd = adaptive(
-            light: UIColor(red: 0.486, green: 0.227, blue: 0.929, alpha: 1),  // #7C3AED
-            dark: UIColor(red: 0.388, green: 0.180, blue: 0.761, alpha: 1)
+            light: UIColor(red: 0.145, green: 0.388, blue: 0.922, alpha: 1),  // #2563EB Royal Blue
+            dark: UIColor(red: 0.114, green: 0.306, blue: 0.847, alpha: 1)    // #1D4ED8
         )
     }
 
@@ -108,25 +148,19 @@ enum PLATokens {
     }
 
     static var savingsGradient: LinearGradient {
-        LinearGradient(
-            colors: [Colors.violetStart, Colors.violetEnd],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        heroGradient
     }
 
+    /// Maps stored category/account color tokens into the restrained Blue + Neutral + Semantic palette.
     static func color(forToken token: String) -> Color {
         switch token.lowercased() {
-        case "teal": return Colors.accent
-        case "blue": return Colors.info
-        case "indigo": return Colors.indigo
         case "green": return Colors.safe
-        case "orange": return Colors.coral
-        case "amber", "yellow": return Colors.warning
+        case "amber", "yellow", "orange": return Colors.warning
         case "red": return Colors.danger
-        case "purple", "violet": return Colors.violet
-        case "pink", "rose": return Colors.rose
-        default: return Color(uiColor: .systemGray)
+        case "teal", "blue", "indigo", "purple", "violet", "pink", "rose":
+            return Colors.accent
+        default:
+            return Colors.textSecondary
         }
     }
 
@@ -134,7 +168,7 @@ enum PLATokens {
         switch priority {
         case .high: return Colors.danger
         case .medium: return Colors.warning
-        case .low: return Colors.info
+        case .low: return Colors.accent
         }
     }
 
@@ -156,7 +190,7 @@ enum PLATokens {
 
     static func color(for status: BudgetHealthStatus) -> Color {
         switch status {
-        case .notSet: return Color(uiColor: .secondaryLabel)
+        case .notSet: return Colors.textSecondary
         case .safe: return Colors.safe
         case .warning: return Colors.warning
         case .exceeded: return Colors.danger
@@ -184,9 +218,9 @@ enum PLATokens {
     static func color(for severity: InsightSeverity) -> Color {
         switch severity {
         case .critical: return Colors.danger
-        case .high: return Colors.coral
+        case .high: return Colors.danger
         case .medium: return Colors.warning
-        case .info: return Colors.info
+        case .info: return Colors.accent
         }
     }
 

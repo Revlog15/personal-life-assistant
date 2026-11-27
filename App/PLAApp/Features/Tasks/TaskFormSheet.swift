@@ -256,7 +256,7 @@ struct TaskFormSheet: View {
 
     private var smartReminderSummary: String? {
         guard let due = resolvedLocalDate else {
-            return "Tanpa deadline — tugas akan masuk segmen Kapan Saja tanpa notifikasi otomatis."
+            return "Tanpa deadline: tugas akan masuk segmen Kapan Saja tanpa notifikasi otomatis."
         }
         let draft = PLATask(
             title: title.isEmpty ? "Draft" : title,

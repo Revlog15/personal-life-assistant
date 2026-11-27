@@ -10,7 +10,7 @@ struct PLAAppGroupStatus: Equatable, Sendable {
 
     var summaryText: String {
         let accessText = isContainerAccessible ? "Tersedia" : "Tidak tersedia (fallback lokal)"
-        return "\(resolvedGroupId) [\(resolutionSource)] — \(accessText)"
+        return "\(resolvedGroupId) [\(resolutionSource)]: \(accessText)"
     }
 }
 
@@ -131,7 +131,7 @@ enum PLASharedContainer {
         return try? decoder.decode(PLAWidgetSnapshot.self, from: data)
     }
 
-    // MARK: - Pending OCR Receipt Handoff (P-05 Intent + P-06 Share Extension — Text Only, Zero Image Bytes)
+    // MARK: - Pending OCR Receipt Handoff (P-05 Intent + P-06 Share Extension, Text Only, Zero Image Bytes)
 
     @discardableResult
     static func savePendingOCRDraft(_ draft: SharedOCRReceiptPayload) -> Bool {

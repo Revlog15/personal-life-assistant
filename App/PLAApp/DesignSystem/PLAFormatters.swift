@@ -21,12 +21,31 @@ enum PLAFormatters {
         "", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"
     ]
 
+    private static let singleLetterWeekdays = [
+        "", "S", "S", "R", "K", "J", "S", "M"
+    ]
+
     /// Deterministic Indonesian Rupiah string independent of device locale settings (`Rp1.500.000`).
     static func rupiah(_ amount: Int64) -> String {
         let isNegative = amount < 0
         let absValue: UInt64 = amount == Int64.min ? UInt64(Int64.max) + 1 : UInt64(abs(amount))
         let grouped = groupDigits(String(absValue))
         return isNegative ? "-Rp\(grouped)" : "Rp\(grouped)"
+    }
+
+    /// Compact Indonesian Rupiah string for tight chart headers/axis labels (`Rp1,5 jt`, `Rp250 rb`).
+    static func compactRupiah(_ amount: Int64) -> String {
+        let isNegative = amount < 0
+        let absVal = Double(abs(amount))
+        let prefix = isNegative ? "-Rp" : "Rp"
+        if absVal >= 1_000_000 {
+            let formatted = String(format: "%.1f", absVal / 1_000_000).replacingOccurrences(of: ".", with: ",")
+            return "\(prefix)\(formatted) jt"
+        }
+        if absVal >= 1_000 {
+            return "\(prefix)\(groupedInteger(Int64(absVal / 1_000))) rb"
+        }
+        return rupiah(amount)
     }
 
     /// Formats any integer with dot thousand separators (`2.000`, `1.000.000`).
@@ -81,6 +100,16 @@ enum PLAFormatters {
         return "\(date.day) \(m) \(date.year)"
     }
 
+    static func shortDayMonth(_ date: LocalDate) -> String {
+        let m = (1...12).contains(date.month) ? shortMonths[date.month] : "\(date.month)"
+        return "\(date.day) \(m)"
+    }
+
+    static func monthYear(_ date: LocalDate) -> String {
+        let m = (1...12).contains(date.month) ? fullMonths[date.month] : "\(date.month)"
+        return "\(m) \(date.year)"
+    }
+
     static func fullDate(_ date: LocalDate) -> String {
         let wd = (1...7).contains(date.weekdayISO) ? fullWeekdays[date.weekdayISO] : ""
         let m = (1...12).contains(date.month) ? fullMonths[date.month] : "\(date.month)"
@@ -89,6 +118,10 @@ enum PLAFormatters {
 
     static func shortWeekday(_ weekdayISO: Int) -> String {
         (1...7).contains(weekdayISO) ? shortWeekdays[weekdayISO] : ""
+    }
+
+    static func singleLetterWeekday(_ weekdayISO: Int) -> String {
+        (1...7).contains(weekdayISO) ? singleLetterWeekdays[weekdayISO] : ""
     }
 
     static func time24(_ minutes: Int) -> String {

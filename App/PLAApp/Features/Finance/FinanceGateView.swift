@@ -17,55 +17,55 @@ struct FinanceGateView: View {
                     VStack(spacing: PLATokens.Spacing.xl) {
                         Spacer()
 
-                        ZStack {
-                            Circle()
-                                .fill(PLATokens.Colors.accent.opacity(0.14))
-                                .frame(width: 112, height: 112)
-                            Image(systemName: "lock.shield.fill")
-                                .font(.system(size: 50))
-                                .foregroundStyle(PLATokens.Colors.accent)
-                        }
-                        .accessibilityHidden(true)
+                        PLACard(padding: PLATokens.Spacing.xl, cornerRadius: PLATokens.Radius.xl) {
+                            VStack(spacing: PLATokens.Spacing.lg) {
+                                ZStack {
+                                    Circle()
+                                        .fill(PLATokens.Colors.softBlueTint)
+                                        .frame(width: 88, height: 88)
+                                    Image(systemName: "lock.shield.fill")
+                                        .font(.system(size: 40))
+                                        .foregroundStyle(PLATokens.Colors.accent)
+                                }
+                                .accessibilityHidden(true)
 
-                        VStack(spacing: PLATokens.Spacing.sm) {
-                            Text("Keuangan Terkunci")
-                                .font(.title2.weight(.bold))
-                            Text("Autentikasi dengan \(store.authService.biometryDisplayName()) atau Passcode iPhone untuk melihat saldo, tagihan, dan transaksi Anda.")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, PLATokens.Spacing.xl)
-                        }
+                                VStack(spacing: PLATokens.Spacing.xs) {
+                                    Text("Keuangan Terkunci")
+                                        .font(.title3.weight(.bold))
+                                        .foregroundStyle(PLATokens.Colors.textPrimary)
+                                    Text("Autentikasi dengan \(store.authService.biometryDisplayName()) atau Passcode iPhone untuk melihat saldo, tagihan, dan transaksi Anda.")
+                                        .font(.subheadline)
+                                        .foregroundStyle(PLATokens.Colors.textSecondary)
+                                        .multilineTextAlignment(.center)
+                                }
 
-                        if let err = store.authService.lastErrorMessage {
-                            Text(err)
-                                .font(.footnote.weight(.medium))
-                                .foregroundStyle(PLATokens.Colors.danger)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, PLATokens.Spacing.xl)
-                        }
+                                if let err = store.authService.lastErrorMessage {
+                                    Text(err)
+                                        .font(.footnote.weight(.semibold))
+                                        .foregroundStyle(PLATokens.Colors.danger)
+                                        .multilineTextAlignment(.center)
+                                }
 
-                        Button {
-                            _Concurrency.Task {
-                                _ = await store.authService.unlockFinance()
+                                PLAPrimaryPillButton(
+                                    title: store.authService.lastErrorMessage == nil ? "Buka Keuangan" : "Coba Lagi",
+                                    systemImage: "faceid",
+                                    isDisabled: store.authService.isAuthenticating
+                                ) {
+                                    _Concurrency.Task {
+                                        _ = await store.authService.unlockFinance()
+                                    }
+                                }
                             }
-                        } label: {
-                            Label(
-                                store.authService.lastErrorMessage == nil ? "Buka Keuangan" : "Coba Lagi",
-                                systemImage: "faceid"
-                            )
-                            .font(.headline)
-                            .frame(maxWidth: 260, minHeight: PLATokens.minTouchTarget)
+                            .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(PLATokens.Colors.accent)
-                        .disabled(store.authService.isAuthenticating)
+                        .padding(.horizontal, PLATokens.Spacing.lg)
 
                         Spacer()
                     }
+                    .padding(.bottom, PLATokens.floatingDockClearance)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(PLATokens.Colors.canvas)
-                    .navigationTitle("Keuangan")
+                    .background(PLATokens.Colors.canvas.ignoresSafeArea())
+                    .toolbar(.hidden, for: .navigationBar)
                     .onAppear {
                         if !hasAutoPromptedThisVisit {
                             hasAutoPromptedThisVisit = true

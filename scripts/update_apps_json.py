@@ -16,7 +16,7 @@ def main() -> None:
     parser.add_argument("--min-os", default="17.0")
     parser.add_argument(
         "--notes",
-        default="Rilis Personal Life Assistant v2.1.0 (Full PRD v0.2: MVP + Pasca-MVP lengkap termasuk Share Extension OCR native P-06, WidgetKit Home 2x2/4x2 & Lock Screen P-07, Diagnostik App Group V-07).",
+        default="Rilis Personal Life Assistant v2.3.0: desain ulang Putih & Biru dengan mode gelap (Otomatis/Terang/Gelap), Floating Liquid Glass Tab Bar, grafik pengeluaran harian real-time, kalender 7 hari dengan timeline tugas, cincin progres 7 hari, dan pemformatan Rupiah 1.000.000.",
     )
     args = parser.parse_args()
 

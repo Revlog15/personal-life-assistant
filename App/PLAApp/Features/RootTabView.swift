@@ -38,45 +38,39 @@ struct RootTabView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            TabView(selection: $selectedTab) {
-                DashboardView(
-                    selectedTab: $selectedTab,
-                    onQuickAdd: { activeQuickAdd = $0 }
-                )
-                .tabItem {
-                    Label("Beranda", systemImage: "house.fill")
+            Group {
+                switch selectedTab {
+                case .dashboard:
+                    DashboardView(
+                        selectedTab: $selectedTab,
+                        onQuickAdd: { activeQuickAdd = $0 }
+                    )
+                case .tasks:
+                    TasksView()
+                case .finance:
+                    FinanceGateView()
+                case .settings:
+                    SettingsView()
                 }
-                .tag(AppTab.dashboard)
-
-                TasksView()
-                    .tabItem {
-                        Label("Tugas", systemImage: "checklist")
-                    }
-                    .tag(AppTab.tasks)
-
-                FinanceGateView()
-                    .tabItem {
-                        Label("Keuangan", systemImage: "wallet.pass.fill")
-                    }
-                    .tag(AppTab.finance)
-
-                SettingsView()
-                    .tabItem {
-                        Label("Pengaturan", systemImage: "gearshape.fill")
-                    }
-                    .tag(AppTab.settings)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(PLATokens.Colors.canvas.ignoresSafeArea())
             .tint(PLATokens.Colors.accent)
 
-            if let message = store.toastMessage {
-                ToastBannerView(
-                    message: message,
-                    undoTitle: store.toastUndoTitle,
-                    onUndo: store.toastUndoTitle != nil ? { store.triggerToastUndo() } : nil
-                )
-                .padding(.bottom, 64)
-                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+            // Detached Floating Liquid Glass Bottom Dock (stays behind keyboard when typing)
+            VStack(spacing: PLATokens.Spacing.sm) {
+                if let message = store.toastMessage {
+                    ToastBannerView(
+                        message: message,
+                        undoTitle: store.toastUndoTitle,
+                        onUndo: store.toastUndoTitle != nil ? { store.triggerToastUndo() } : nil
+                    )
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                }
+
+                PLAFloatingGlassTabBar(selectedTab: $selectedTab)
             }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
 
             // AC-12.3: Blur privacy cover in App Switcher whenever Finance tab is visible or finance lock is active
             if scenePhase != .active && selectedTab == .finance && store.settings.financeLockEnabled {
@@ -145,9 +139,10 @@ struct RootTabView: View {
                     .foregroundStyle(PLATokens.Colors.accent)
                 Text("Keuangan Terlindungi")
                     .font(.headline)
+                    .foregroundStyle(PLATokens.Colors.textPrimary)
                 Text("Data finansial disembunyikan saat berpindah aplikasi.")
                     .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(PLATokens.Colors.textSecondary)
                     .multilineTextAlignment(.center)
             }
             .padding(PLATokens.Spacing.xl)

@@ -2,7 +2,7 @@ import SwiftUI
 import PLACore
 
 enum TaskSegment: Int, CaseIterable, Identifiable {
-    case today = 0
+    case agenda = 0
     case upcoming = 1
     case anytime = 2
     case completed = 3
@@ -10,38 +10,40 @@ enum TaskSegment: Int, CaseIterable, Identifiable {
     var id: Int { rawValue }
     var title: String {
         switch self {
-        case .today: return "Hari Ini"
+        case .agenda: return "Jadwal"
         case .upcoming: return "Mendatang"
         case .anytime: return "Kapan Saja"
         case .completed: return "Selesai"
         }
     }
-
-    var accentColor: Color {
-        switch self {
-        case .today: return PLATokens.Colors.indigo
-        case .upcoming: return PLATokens.Colors.info
-        case .anytime: return PLATokens.Colors.violet
-        case .completed: return PLATokens.Colors.safe
-        }
-    }
 }
 
-/// Tasks tab (PRD §7.2, F-02..F-06) with domain-colored pill segments and rich category/priority indicators.
+/// Tasks tab (PRD §7.2, F-02..F-06): Horizontal 7-day calendar strip, time-slotted agenda timeline,
+/// natural-language quick-add bar, and full-width Royal Blue pill CTA.
 struct TasksView: View {
     @Environment(AppStore.self) private var store
 
-    @State private var selectedSegment: TaskSegment = .today
+    @State private var selectedSegment: TaskSegment = .agenda
+    @State private var selectedDate: LocalDate? = nil
     @State private var showAddSheet = false
     @State private var editingTask: PLATask?
     @State private var reschedulingTask: PLATask?
-
     @State private var recurringTaskToDelete: PLATask?
     @State private var overdueRecurringToComplete: PLATask?
 
+    private var activeDate: LocalDate {
+        selectedDate ?? store.today
+    }
+
+    private var weekDatesAroundSelected: [LocalDate] {
+        let mondayOffset = -(activeDate.weekdayISO - 1)
+        let monday = activeDate.addingDays(mondayOffset)
+        return (0..<7).map { monday.addingDays($0) }
+    }
+
     private func countFor(_ segment: TaskSegment) -> Int {
         switch segment {
-        case .today: return store.todayTasks.count + store.overdueTasks.count
+        case .agenda: return store.todayTasks.count + store.overdueTasks.count
         case .upcoming: return store.upcomingTasks.count
         case .anytime: return store.anytimeTasks.count
         case .completed: return store.completedTasks.count
@@ -50,62 +52,38 @@ struct TasksView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: PLATokens.Spacing.xs) {
-                        ForEach(TaskSegment.allCases) { seg in
-                            let active = selectedSegment == seg
-                            let count = countFor(seg)
-                            Button {
-                                selectedSegment = seg
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Text(seg.title)
-                                        .font(.subheadline.weight(active ? .semibold : .medium))
-                                    if count > 0 {
-                                        Text("\(count)")
-                                            .font(.caption2.weight(.bold))
-                                            .monospacedDigit()
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(active ? Color.white.opacity(0.24) : seg.accentColor.opacity(0.16), in: Capsule())
-                                            .foregroundStyle(active ? Color.white : seg.accentColor)
-                                    }
-                                }
-                                .padding(.horizontal, PLATokens.Spacing.md)
-                                .frame(minHeight: 36)
-                                .background(active ? seg.accentColor : PLATokens.Colors.surface)
-                                .foregroundStyle(active ? Color.white : Color.primary)
-                                .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(.horizontal, PLATokens.Spacing.lg)
-                    .padding(.vertical, PLATokens.Spacing.sm)
-                }
-                .background(PLATokens.Colors.canvas)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: PLATokens.Spacing.lg) {
+                    headerBar
 
-                List {
-                    Section {
-                        QuickAddNaturalBar()
-                    }
+                    PLAWeekStripCalendar(
+                        selectedDate: Binding(
+                            get: { activeDate },
+                            set: { newDate in
+                                selectedDate = newDate
+                                selectedSegment = .agenda
+                            }
+                        ),
+                        today: store.today,
+                        activeTaskDates: store.datesWithActiveTasks(in: weekDatesAroundSelected)
+                    )
+
+                    segmentStrip
+
+                    QuickAddNaturalBar()
 
                     if let topSuggestion = store.personalSuggestions.first {
-                        Section {
+                        PLACard(padding: PLATokens.Spacing.md) {
                             PersonalSuggestionRow(
                                 suggestion: topSuggestion,
                                 onAccept: { store.acceptPersonalSuggestion(topSuggestion) },
                                 onDismiss: { store.dismissPersonalSuggestion(topSuggestion) }
                             )
-                        } header: {
-                            Label("Saran Kebiasaan Lokal", systemImage: "sparkles")
-                                .foregroundStyle(PLATokens.Colors.violet)
                         }
                     }
 
                     if store.notificationAuthStatus == .denied {
-                        Section {
+                        PLACard(padding: PLATokens.Spacing.md) {
                             AlertBannerRow(
                                 icon: "bell.slash.fill",
                                 tint: PLATokens.Colors.warning,
@@ -118,50 +96,43 @@ struct TasksView: View {
                     }
 
                     switch selectedSegment {
-                    case .today:
-                        todayContent
+                    case .agenda:
+                        agendaContent
                     case .upcoming:
                         taskListSection(
+                            title: "Tugas Mendatang",
                             tasks: store.upcomingTasks,
                             emptyTitle: "Belum Ada Tugas Mendatang",
-                            emptyMessage: "Tambahkan tugas dengan deadline agar Smart Reminder otomatis berjalan.",
-                            tint: PLATokens.Colors.info
+                            emptyMessage: "Tambahkan tugas dengan deadline agar Smart Reminder otomatis berjalan."
                         )
                     case .anytime:
                         taskListSection(
+                            title: "Daftar Kapan Saja",
                             tasks: store.anytimeTasks,
                             emptyTitle: "Daftar Kapan Saja Kosong",
-                            emptyMessage: "Tugas tanpa deadline akan tersimpan rapi di sini.",
-                            tint: PLATokens.Colors.violet
+                            emptyMessage: "Tugas tanpa tanggal jatuh tempo akan tersimpan rapi di sini."
                         )
                     case .completed:
                         taskListSection(
+                            title: "Riwayat Selesai",
                             tasks: store.completedTasks,
                             emptyTitle: "Belum Ada Tugas Selesai",
                             emptyMessage: "Tugas yang telah dicentang selesai akan tampil sebagai riwayat di sini.",
-                            tint: PLATokens.Colors.safe,
                             allowAddCTA: false
                         )
                     }
-                }
-                .listStyle(.insetGrouped)
-                .scrollContentBackground(.hidden)
-                .background(PLATokens.Colors.canvas)
-            }
-            .navigationTitle("Tugas")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
+
+                    PLAPrimaryPillButton(title: "Tambah Tugas", systemImage: "plus") {
                         showAddSheet = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(PLATokens.Colors.indigo)
-                            .frame(minWidth: PLATokens.minTouchTarget, minHeight: PLATokens.minTouchTarget)
                     }
-                    .accessibilityLabel("Tambah tugas baru")
+                    .padding(.top, PLATokens.Spacing.xs)
                 }
+                .padding(.horizontal, PLATokens.Spacing.lg)
+                .padding(.top, PLATokens.Spacing.sm)
+                .padding(.bottom, PLATokens.floatingDockClearance)
             }
+            .background(PLATokens.Colors.canvas.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showAddSheet) {
                 TaskFormSheet()
                     .environment(store)
@@ -221,182 +192,295 @@ struct TasksView: View {
         }
     }
 
-    @ViewBuilder
-    private var todayContent: some View {
-        if !store.overdueTasks.isEmpty {
-            Section {
-                ForEach(store.overdueTasks) { task in
-                    taskRow(task, isOverdue: true)
+    // MARK: - Header & Segment Pills
+
+    private var headerBar: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Agenda & Pengingat")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(PLATokens.Colors.textSecondary)
+                Text("Tugas")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(PLATokens.Colors.textPrimary)
+            }
+            Spacer()
+            Button {
+                showAddSheet = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.body.weight(.bold))
+                    .foregroundStyle(Color.white)
+                    .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
+                    .background(PLATokens.Colors.primaryBlue, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Tambah tugas baru")
+        }
+    }
+
+    private var segmentStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: PLATokens.Spacing.sm) {
+                ForEach(TaskSegment.allCases) { seg in
+                    let active = selectedSegment == seg
+                    let count = countFor(seg)
+                    Button {
+                        selectedSegment = seg
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text(seg.title)
+                                .font(.subheadline.weight(active ? .bold : .medium))
+                            if count > 0 {
+                                Text("\(count)")
+                                    .font(.caption2.weight(.bold))
+                                    .monospacedDigit()
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        active ? Color.white.opacity(0.24) : PLATokens.Colors.softBlueTint,
+                                        in: Capsule()
+                                    )
+                                    .foregroundStyle(active ? Color.white : PLATokens.Colors.softBlueText)
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 38)
+                        .background(
+                            Capsule()
+                                .fill(active ? PLATokens.Colors.primaryBlue : PLATokens.Colors.surface)
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(active ? Color.clear : PLATokens.Colors.border, lineWidth: 1)
+                        )
+                        .foregroundStyle(active ? Color.white : PLATokens.Colors.textPrimary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(active ? .isSelected : [])
                 }
-            } header: {
-                Label("Terlambat (\(store.overdueTasks.count))", systemImage: "exclamationmark.circle.fill")
-                    .foregroundStyle(PLATokens.Colors.danger)
+            }
+        }
+    }
+
+    // MARK: - Agenda Timeline Content
+
+    @ViewBuilder
+    private var agendaContent: some View {
+        let isTodaySelected = activeDate == store.today
+        let scheduled = store.tasksScheduled(on: activeDate)
+
+        if isTodaySelected && !store.overdueTasks.isEmpty {
+            VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+                PLASectionHeader(title: "Terlambat (\(store.overdueTasks.count))")
+                VStack(spacing: PLATokens.Spacing.sm) {
+                    ForEach(store.overdueTasks) { task in
+                        timelineTaskRow(task, isOverdue: true)
+                    }
+                }
             }
         }
 
-        Section {
-            if store.todayTasks.isEmpty {
-                if store.overdueTasks.isEmpty {
+        VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+            PLASectionHeader(
+                title: isTodaySelected ? "Hari Ini" : PLAFormatters.fullDate(activeDate),
+                subtitle: isTodaySelected ? PLAFormatters.fullDate(store.today) : nil
+            )
+
+            if scheduled.isEmpty {
+                if !isTodaySelected || store.overdueTasks.isEmpty {
                     PLAEmptyStateView(
-                        title: "Hari Ini Bersih",
-                        message: "Tidak ada tugas jatuh tempo hari ini. Ketuk tombol di bawah untuk mencatat tugas cepat.",
+                        title: isTodaySelected ? "Hari Ini Bersih" : "Belum Ada Jadwal",
+                        message: isTodaySelected
+                            ? "Tidak ada tugas jatuh tempo hari ini. Gunakan kolom ketik cepat atau tombol Tambah Tugas di bawah."
+                            : "Tidak ada tugas terjadwal pada \(PLAFormatters.shortDate(activeDate)).",
                         systemImage: "checkmark.seal.fill",
-                        tint: PLATokens.Colors.safe,
-                        actionTitle: "Buat Tugas",
-                        action: { showAddSheet = true }
+                        tint: PLATokens.Colors.accent
                     )
-                    .listRowBackground(Color.clear)
                 } else {
-                    Text("Tidak ada tugas tambahan jatuh tempo hari ini.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    PLACard(padding: PLATokens.Spacing.md) {
+                        Text("Tidak ada tugas tambahan jatuh tempo hari ini.")
+                            .font(.subheadline)
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
+                    }
                 }
             } else {
-                ForEach(store.todayTasks) { task in
-                    taskRow(task, isOverdue: false)
+                VStack(spacing: PLATokens.Spacing.md) {
+                    ForEach(scheduled) { task in
+                        timelineTaskRow(task, isOverdue: task.isOverdue(at: store.currentDateTime))
+                    }
                 }
             }
-        } header: {
-            Label("Hari Ini", systemImage: "sun.max.fill")
-                .foregroundStyle(PLATokens.Colors.indigo)
         }
     }
 
     @ViewBuilder
     private func taskListSection(
+        title: String,
         tasks: [PLATask],
         emptyTitle: String,
         emptyMessage: String,
-        tint: Color,
         allowAddCTA: Bool = true
     ) -> some View {
-        if tasks.isEmpty {
-            Section {
+        VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+            PLASectionHeader(title: title)
+
+            if tasks.isEmpty {
                 PLAEmptyStateView(
                     title: emptyTitle,
                     message: emptyMessage,
                     systemImage: "checklist",
-                    tint: tint,
+                    tint: PLATokens.Colors.accent,
                     actionTitle: allowAddCTA ? "Buat Tugas" : nil,
                     action: allowAddCTA ? { showAddSheet = true } : nil
                 )
-                .listRowBackground(Color.clear)
-            }
-        } else {
-            Section {
-                ForEach(tasks) { task in
-                    taskRow(task, isOverdue: task.isOverdue(at: store.currentDateTime))
+            } else {
+                VStack(spacing: PLATokens.Spacing.sm) {
+                    ForEach(tasks) { task in
+                        timelineTaskRow(task, isOverdue: task.isOverdue(at: store.currentDateTime))
+                    }
                 }
             }
         }
     }
 
-    private func taskRow(_ task: PLATask, isOverdue: Bool) -> some View {
+    // MARK: - Reference-Inspired Time-Slotted Task Row
+
+    private func timelineTaskRow(_ task: PLATask, isOverdue: Bool) -> some View {
         let isCompleted = task.status == .completed
         let rule = store.recurrenceRule(for: task.recurrenceRuleId)
-        let cat = store.categories.first { $0.id == task.categoryId }
-        let catColor = cat.map { PLATokens.color(forToken: $0.colorToken) } ?? PLATokens.Colors.indigo
+        let timeLabel = task.dueTimeMinutes.map { PLAFormatters.time24($0) } ?? "Harian"
 
-        return VStack(alignment: .leading, spacing: PLATokens.Spacing.xs) {
-            HStack(alignment: .center, spacing: PLATokens.Spacing.sm) {
-                Button {
-                    handleCompleteTap(task)
-                } label: {
-                    Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                        .font(.title3)
-                        .foregroundStyle(isCompleted ? PLATokens.Colors.safe : PLATokens.color(for: task.priority))
-                        .frame(minWidth: PLATokens.minTouchTarget, minHeight: PLATokens.minTouchTarget)
+        return HStack(alignment: .top, spacing: PLATokens.Spacing.sm) {
+            // Left time gutter (inspired by reference's 06.00 / 08.00 / 16.00 column)
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(timeLabel)
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(isOverdue && !isCompleted ? PLATokens.Colors.danger : PLATokens.Colors.textSecondary)
+                if let due = task.dueDateLocal, selectedSegment != .agenda {
+                    Text(PLAFormatters.shortDayMonth(due))
+                        .font(.caption2)
+                        .foregroundStyle(PLATokens.Colors.textSecondary)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isCompleted ? "Buka ulang tugas \(task.title)" : "Selesaikan tugas \(task.title)")
+            }
+            .frame(width: 52, alignment: .trailing)
+            .padding(.top, 14)
 
-                Button {
-                    editingTask = task
-                } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(task.title)
-                            .font(.body.weight(.semibold))
-                            .strikethrough(isCompleted)
-                            .foregroundStyle(isCompleted ? .secondary : .primary)
-
-                        if let notes = task.notes, !notes.isEmpty {
-                            Text(notes)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
+            // Right crisp content card
+            PLACard(padding: PLATokens.Spacing.md, cornerRadius: 18) {
+                VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+                    HStack(alignment: .top, spacing: PLATokens.Spacing.sm) {
+                        Button {
+                            handleCompleteTap(task)
+                        } label: {
+                            Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                                .font(.title3)
+                                .foregroundStyle(isCompleted ? PLATokens.Colors.safe : PLATokens.color(for: task.priority))
+                                .frame(minWidth: PLATokens.minTouchTarget, minHeight: PLATokens.minTouchTarget)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(isCompleted ? "Buka ulang tugas \(task.title)" : "Selesaikan tugas \(task.title)")
 
-                        HStack(spacing: PLATokens.Spacing.sm) {
+                        Button {
+                            editingTask = task
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(task.title)
+                                    .font(.subheadline.weight(.bold))
+                                    .strikethrough(isCompleted)
+                                    .foregroundStyle(isCompleted ? PLATokens.Colors.textSecondary : PLATokens.Colors.textPrimary)
+                                    .multilineTextAlignment(.leading)
+
+                                if let notes = task.notes, !notes.isEmpty {
+                                    Text(notes)
+                                        .font(.caption)
+                                        .foregroundStyle(PLATokens.Colors.textSecondary)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                }
+
+                                HStack(spacing: PLATokens.Spacing.xs) {
+                                    Text(store.categoryName(for: task.categoryId))
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(PLATokens.Colors.softBlueText)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 2)
+                                        .background(PLATokens.Colors.softBlueTint, in: Capsule())
+
+                                    if task.priority != .medium {
+                                        StatusBadge(
+                                            text: PLATokens.label(for: task.priority),
+                                            icon: PLATokens.icon(for: task.priority),
+                                            color: PLATokens.color(for: task.priority)
+                                        )
+                                    }
+
+                                    if let rule {
+                                        Label(PLAFormatters.recurrenceLabel(rule), systemImage: "repeat")
+                                            .font(.caption2)
+                                            .foregroundStyle(PLATokens.Colors.textSecondary)
+                                    }
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+
+                        Menu {
+                            Button {
+                                editingTask = task
+                            } label: {
+                                Label("Sunting", systemImage: "pencil")
+                            }
+                            if !isCompleted {
+                                Button {
+                                    reschedulingTask = task
+                                } label: {
+                                    Label("Jadwalkan Ulang", systemImage: "calendar.badge.clock")
+                                }
+                            }
+                            Divider()
+                            Button(role: .destructive) {
+                                if task.recurrenceRuleId != nil && task.status == .active {
+                                    recurringTaskToDelete = task
+                                } else {
+                                    store.deleteTask(task, deleteEntireSeries: true)
+                                }
+                            } label: {
+                                Label("Hapus", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(PLATokens.Colors.textSecondary)
+                                .frame(width: 36, height: 36)
+                        }
+                        .accessibilityLabel("Opsi tugas \(task.title)")
+                    }
+
+                    if isOverdue && !isCompleted {
+                        HStack {
                             if let due = task.dueDateLocal {
-                                let label = PLAFormatters.relativeDayLabel(due, today: store.today)
-                                let timeSuffix = task.dueTimeMinutes.map { " • \(PLAFormatters.time24($0))" } ?? ""
-                                Label(label + timeSuffix, systemImage: "calendar")
-                                    .font(.caption.weight(.medium))
-                                    .foregroundStyle(isOverdue ? PLATokens.Colors.danger : PLATokens.Colors.info)
+                                Text(PLAFormatters.relativeDayLabel(due, today: store.today))
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(PLATokens.Colors.danger)
                             }
-                            if let rule {
-                                Label(PLAFormatters.recurrenceLabel(rule), systemImage: "repeat")
-                                    .font(.caption)
+                            Spacer()
+                            Button {
+                                reschedulingTask = task
+                            } label: {
+                                Label("Jadwalkan Ulang", systemImage: "calendar.badge.clock")
+                                    .font(.caption.weight(.semibold))
                                     .foregroundStyle(PLATokens.Colors.accent)
+                                    .padding(.horizontal, 12)
+                                    .frame(minHeight: 36)
+                                    .background(PLATokens.Colors.softBlueTint, in: Capsule())
                             }
-                        }
-
-                        HStack(spacing: PLATokens.Spacing.xs) {
-                            Text(store.categoryName(for: task.categoryId))
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(catColor)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 2)
-                                .background(catColor.opacity(0.14), in: Capsule())
-
-                            if task.priority != .medium {
-                                StatusBadge(
-                                    text: PLATokens.label(for: task.priority),
-                                    icon: PLATokens.icon(for: task.priority),
-                                    color: PLATokens.color(for: task.priority)
-                                )
-                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.plain)
-            }
-
-            if isOverdue && !isCompleted {
-                HStack {
-                    Spacer()
-                    Button {
-                        reschedulingTask = task
-                    } label: {
-                        Label("Jadwalkan Ulang", systemImage: "calendar.badge.clock")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(PLATokens.Colors.indigo)
-                    .controlSize(.small)
-                    .frame(minHeight: PLATokens.minTouchTarget)
-                }
-            }
-        }
-        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            Button(role: .destructive) {
-                if task.recurrenceRuleId != nil && task.status == .active {
-                    recurringTaskToDelete = task
-                } else {
-                    store.deleteTask(task, deleteEntireSeries: true)
-                }
-            } label: {
-                Label("Hapus", systemImage: "trash")
-            }
-
-            if !isCompleted {
-                Button {
-                    reschedulingTask = task
-                } label: {
-                    Label("Jadwalkan", systemImage: "calendar.badge.clock")
-                }
-                .tint(PLATokens.Colors.info)
             }
         }
     }

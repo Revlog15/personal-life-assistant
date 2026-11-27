@@ -112,7 +112,7 @@ struct DiagnosticsView: View {
                 AdaptiveKeyValueRow {
                     Text("Cold Start Terakhir")
                 } trailing: {
-                    Text(store.diagnostics.lastColdStartMs.map { String(format: "%.0f ms", $0) } ?? "—")
+                    Text(store.diagnostics.lastColdStartMs.map { String(format: "%.0f ms", $0) } ?? "-")
                         .monospacedDigit()
                 }
 
@@ -232,6 +232,7 @@ struct DiagnosticsView: View {
                 }
             }
         }
+        .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
         .navigationTitle("Diagnostik")
         .navigationBarTitleDisplayMode(.inline)
         .alert("Tambah Data Uji Benchmark?", isPresented: $showSeedConfirm) {
@@ -315,6 +316,7 @@ struct ComponentCatalogView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .contentMargins(.bottom, PLATokens.floatingDockClearance, for: .scrollContent)
         .navigationTitle("Katalog Komponen")
         .navigationBarTitleDisplayMode(.inline)
     }
