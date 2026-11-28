@@ -19,6 +19,15 @@
       "screenshotURLs": [],
       "versions": [
         {
+          "version": "2.4.0",
+          "buildVersion": "23",
+          "date": "2026-11-28",
+          "localizedDescription": "feat(v2.4.0): support mid-cycle remaining budget carry-in and payday cycle picker in Onboarding and BudgetFormSheet",
+          "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.4.0/PLAApp-2.4.0.ipa",
+          "size": 3180275,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "2.3.1",
           "buildVersion": "21",
           "date": "2026-11-27",
@@ -82,7 +91,7 @@
           "minOSVersion": "17.0"
         }
       ],
-      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.3.1/PLAApp-2.3.1.ipa"
+      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.4.0/PLAApp-2.4.0.ipa"
     }
   ],
   "news": []
