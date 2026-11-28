@@ -33,6 +33,8 @@ struct RootTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    var isSplashFinished: Bool = true
+
     @State private var selectedTab: AppTab = .dashboard
     @State private var activeQuickAdd: QuickAddSheetKind?
 
@@ -91,7 +93,7 @@ struct RootTabView: View {
         }
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: store.toastMessage)
         .fullScreenCover(isPresented: Binding(
-            get: { !store.settings.hasCompletedOnboarding },
+            get: { isSplashFinished && !store.settings.hasCompletedOnboarding },
             set: { _ in }
         )) {
             OnboardingView()

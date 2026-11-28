@@ -16,7 +16,7 @@ def main() -> None:
     parser.add_argument("--min-os", default="17.0")
     parser.add_argument(
         "--notes",
-        default="Rilis Personal Life Assistant v2.5.0: kalender bulanan penuh dengan titik penanda agenda dan tagihan khusus di tab Jadwal, plus deteksi bentrok jadwal otomatis yang memberi tahu agenda bentrok beserta saran jam kosong 1-ketuk di Tambah Tugas, Ketik Cepat, Jadwalkan Ulang, dan Siri.",
+        default="Rilis Personal Life Assistant v2.6.0: layar loading pembuka dengan logo developer mahkota emas dan jubah merah serta tagline Rule Your Day / Pimpin Harimu. Kendalikan Segalanya. di latar OLED hitam mulus tanpa kedipan.",
     )
     args = parser.parse_args()
 
