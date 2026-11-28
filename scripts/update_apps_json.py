@@ -16,7 +16,7 @@ def main() -> None:
     parser.add_argument("--min-os", default="17.0")
     parser.add_argument(
         "--notes",
-        default="Rilis Personal Life Assistant v2.6.0: layar loading pembuka dengan logo developer mahkota emas dan jubah merah serta tagline Rule Your Day / Pimpin Harimu. Kendalikan Segalanya. di latar OLED hitam mulus tanpa kedipan.",
+        default="Rilis Personal Life Assistant v2.6.1: pembaruan slogan developer di layar loading pembuka menjadi BORN TO LEAD (1 baris bersih khas studio di bawah logo mahkota emas dan jubah merah).",
     )
     args = parser.parse_args()
 

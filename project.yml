@@ -66,7 +66,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: id.revand.pla
         PRODUCT_NAME: PLAApp
-        MARKETING_VERSION: "2.6.0"
+        MARKETING_VERSION: "2.6.1"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
@@ -110,7 +110,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: id.revand.pla.share
         PRODUCT_NAME: PLAShareExtension
-        MARKETING_VERSION: "2.6.0"
+        MARKETING_VERSION: "2.6.1"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"
@@ -149,7 +149,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: id.revand.pla.widget
         PRODUCT_NAME: PLAWidgetExtension
-        MARKETING_VERSION: "2.6.0"
+        MARKETING_VERSION: "2.6.1"
         CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "5.9"
         TARGETED_DEVICE_FAMILY: "1"

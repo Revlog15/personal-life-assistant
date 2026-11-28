@@ -33,10 +33,10 @@ struct LaunchSplashView: View {
                         .scaleEffect(reduceMotion ? 1 : (logoVisible ? 1 : 0.92))
                         .accessibilityLabel("Logo Developer")
 
-                    VStack(spacing: 10) {
-                        Text("RULE YOUR DAY")
-                            .font(.system(size: 18, weight: .semibold, design: .serif))
-                            .tracking(4.4)
+                    VStack(spacing: 12) {
+                        Text("BORN TO LEAD")
+                            .font(.system(size: 19, weight: .semibold, design: .serif))
+                            .tracking(5.0)
                             .foregroundStyle(Self.crownGold)
 
                         Capsule()
@@ -48,12 +48,6 @@ struct LaunchSplashView: View {
                                 )
                             )
                             .frame(width: 44, height: 2)
-
-                        Text("Pimpin Harimu. Kendalikan Segalanya.")
-                            .font(.caption.weight(.medium))
-                            .tracking(0.6)
-                            .foregroundStyle(Color.white.opacity(0.72))
-                            .multilineTextAlignment(.center)
                     }
                     .opacity(taglineVisible ? 1 : 0)
                     .offset(y: reduceMotion ? 0 : (taglineVisible ? 0 : 8))
@@ -62,32 +56,25 @@ struct LaunchSplashView: View {
 
                 Spacer()
 
-                VStack(spacing: 10) {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.white.opacity(0.14))
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.14))
 
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Self.crownGold, Self.capeCrimson],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Self.crownGold, Self.capeCrimson],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
                                 )
-                                .frame(width: max(8, geo.size.width * loadingProgress))
-                        }
+                            )
+                            .frame(width: max(8, geo.size.width * loadingProgress))
                     }
-                    .frame(width: 148, height: 3)
-
-                    Text("LIFE ASSISTANT")
-                        .font(.caption2.weight(.semibold))
-                        .tracking(2.0)
-                        .foregroundStyle(Color.white.opacity(0.45))
                 }
+                .frame(width: 148, height: 3)
                 .opacity(taglineVisible ? 1 : 0)
-                .padding(.bottom, 42)
+                .padding(.bottom, 52)
             }
         }
         .contentShape(Rectangle())
