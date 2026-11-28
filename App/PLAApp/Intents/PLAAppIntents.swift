@@ -171,6 +171,36 @@ struct AddTaskIntent: AppIntent {
             ?? taskCategories.first?.id
         let resolvedCategoryName = taskCategories.first { $0.id == resolvedCategoryId }?.name ?? "Umum"
 
+        let existingTasks = (try? store.fetchAllTasks()) ?? []
+        var conflictNote: String? = nil
+        if let due = finalDueDate, let mins = finalDueTimeMinutes {
+            let dayStart = settings.quietHoursEnabled ? settings.quietEndMinutes : 7 * 60
+            let dayEnd = settings.quietHoursEnabled ? settings.quietStartMinutes : 22 * 60
+            let resolvedStart = dayStart < dayEnd ? dayStart : 7 * 60
+            let resolvedEnd = dayStart < dayEnd ? dayEnd : 22 * 60
+            let report = ScheduleConflictEngine.evaluate(
+                date: due,
+                startMinutes: mins,
+                tasks: existingTasks,
+                dayStartMinutes: resolvedStart,
+                dayEndMinutes: resolvedEnd,
+                now: clock.currentLocalDateTime
+            )
+            if report.hasConflict {
+                let conflictTitles = report.conflictingSlots.prefix(2).map {
+                    "\"\($0.title)\" pukul \(PLAFormatters.time24($0.startMinutes))"
+                }.joined(separator: " dan ")
+                if !report.suggestedStartMinutes.isEmpty {
+                    let freeSlots = report.suggestedStartMinutes.prefix(3).map {
+                        PLAFormatters.time24($0)
+                    }.joined(separator: ", ")
+                    conflictNote = "Catatan bentrok: di hari itu sudah ada \(conflictTitles). Kamu kosong pada jam \(freeSlots)."
+                } else {
+                    conflictNote = "Catatan bentrok: di hari itu sudah ada \(conflictTitles) dan jadwal hari itu cukup padat."
+                }
+            }
+        }
+
         let task = PLATask(
             title: parsed.title,
             notes: resolvedNotes,
@@ -204,7 +234,11 @@ struct AddTaskIntent: AppIntent {
             summaryParts.append("catatan: \(notes)")
         }
 
-        return .result(dialog: "\(summaryParts.joined(separator: ", ")).")
+        var dialogText = "\(summaryParts.joined(separator: ", "))."
+        if let conflictNote {
+            dialogText += " \(conflictNote)"
+        }
+        return .result(dialog: "\(dialogText)")
     }
 
     private func cleanOptionalNote(_ raw: String?) -> String? {
@@ -223,13 +257,15 @@ struct AddTaskIntent: AppIntent {
               let transactions = try? store.fetchAllTransactions(),
               let budgets = try? store.fetchAllBudgets(),
               let categories = try? store.fetchAllCategories() else { return }
+        let currentPeriod = BudgetPeriod.current(for: clock.today, cycleStartDay: settings.budgetCycleStartDay)
         let summary = BudgetCalculator.summarize(
             today: clock.today,
             cycleStartDay: settings.budgetCycleStartDay,
             transactions: transactions,
             budgets: budgets,
             bills: bills,
-            categories: categories
+            categories: categories,
+            openingSpent: settings.openingSpent(for: currentPeriod.periodKey)
         )
         let snapshot = WidgetSnapshotBuilder.build(
             today: clock.today,

@@ -756,107 +756,254 @@ struct PLAMiniRingDayColumn: View {
     }
 }
 
-/// Borderless, flat 7-day horizontal calendar strip sitting directly on the canvas (matching the reference `Daily Goals` layout).
-/// All interactive buttons meet 44x44pt minimum touch target.
-struct PLAWeekStripCalendar: View {
+/// Full monthly calendar grid (7 columns Mon-Sun) with crisp per-day indicator dots for scheduled tasks and bills.
+/// Displayed exclusively on the Jadwal tab; all tap targets meet >= 44x44pt.
+struct PLAMonthCalendarView: View {
     @Binding var selectedDate: LocalDate
     let today: LocalDate
-    let activeTaskDates: Set<LocalDate>
+    let markers: [LocalDate: PLACalendarDayMarker]
 
-    private var weekDates: [LocalDate] {
-        let mondayOffset = -(selectedDate.weekdayISO - 1)
-        let monday = selectedDate.addingDays(mondayOffset)
-        return (0..<7).map { monday.addingDays($0) }
+    private let weekdayLabels = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"]
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 7)
+
+    private var monthCells: [LocalDate?] {
+        guard let firstDay = LocalDate(year: selectedDate.year, month: selectedDate.month, day: 1) else {
+            return []
+        }
+        let leadingBlanks = max(0, firstDay.weekdayISO - 1) // Monday = 1 -> 0 blanks
+        let daysInMonth = LocalDate.daysInMonth(year: selectedDate.year, month: selectedDate.month)
+
+        var cells: [LocalDate?] = Array(repeating: nil, count: leadingBlanks)
+        for day in 1...daysInMonth {
+            cells.append(LocalDate(year: selectedDate.year, month: selectedDate.month, day: day))
+        }
+        return cells
     }
 
     var body: some View {
-        VStack(spacing: PLATokens.Spacing.sm) {
-            HStack(spacing: PLATokens.Spacing.xs) {
-                Text(PLAFormatters.monthYear(selectedDate))
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(PLATokens.Colors.textPrimary)
+        PLACard(padding: PLATokens.Spacing.md, cornerRadius: PLATokens.Radius.lg) {
+            VStack(spacing: PLATokens.Spacing.sm) {
+                // Month header + Today shortcut + Prev/Next month arrows (44x44pt)
+                HStack(spacing: PLATokens.Spacing.xs) {
+                    Text(PLAFormatters.monthYear(selectedDate))
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(PLATokens.Colors.textPrimary)
 
-                Spacer()
+                    Spacer()
 
-                if selectedDate != today {
-                    Button("Hari Ini") {
-                        selectedDate = today
+                    if selectedDate != today {
+                        Button("Hari Ini") {
+                            selectedDate = today
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(PLATokens.Colors.accent)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: PLATokens.minTouchTarget)
+                        .buttonStyle(.plain)
                     }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(PLATokens.Colors.accent)
-                    .padding(.horizontal, 12)
-                    .frame(minHeight: PLATokens.minTouchTarget)
-                    .buttonStyle(.plain)
-                }
-
-                Button {
-                    selectedDate = selectedDate.addingDays(-7)
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                        .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Minggu sebelumnya")
-
-                Button {
-                    selectedDate = selectedDate.addingDays(7)
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(PLATokens.Colors.textSecondary)
-                        .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Minggu berikutnya")
-            }
-
-            HStack(spacing: 4) {
-                ForEach(weekDates, id: \.self) { date in
-                    let isSelected = date == selectedDate
-                    let isToday = date == today
-                    let hasTasks = activeTaskDates.contains(date)
 
                     Button {
-                        selectedDate = date
+                        selectedDate = selectedDate.addingMonths(-1)
                     } label: {
-                        VStack(spacing: 6) {
-                            Text(PLAFormatters.singleLetterWeekday(date.weekdayISO))
-                                .font(.caption2.weight(.semibold))
-                                .foregroundStyle(
-                                    isSelected
-                                    ? PLATokens.Colors.softBlueText
-                                    : PLATokens.Colors.textSecondary
-                                )
-
-                            Text(date.day < 10 ? "0\(date.day)" : "\(date.day)")
-                                .font(.subheadline.weight(isSelected || isToday ? .bold : .medium))
-                                .monospacedDigit()
-                                .foregroundStyle(
-                                    isSelected
-                                    ? PLATokens.Colors.softBlueText
-                                    : PLATokens.Colors.textPrimary
-                                )
-
-                            Circle()
-                                .fill(hasTasks ? PLATokens.Colors.accent : Color.clear)
-                                .frame(width: 5, height: 5)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 62)
-                        .background {
-                            if isSelected {
-                                Capsule()
-                                    .fill(PLATokens.Colors.softBlueTint)
-                            }
-                        }
+                        Image(systemName: "chevron.left")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
+                            .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("\(PLAFormatters.fullDate(date))\(hasTasks ? ", ada tugas aktif" : "")")
-                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    .accessibilityLabel("Bulan sebelumnya")
+
+                    Button {
+                        selectedDate = selectedDate.addingMonths(1)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
+                            .frame(width: PLATokens.minTouchTarget, height: PLATokens.minTouchTarget)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Bulan berikutnya")
+                }
+
+                // Weekday headers (Sen..Min)
+                LazyVGrid(columns: columns, spacing: 2) {
+                    ForEach(weekdayLabels, id: \.self) { label in
+                        Text(label)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+
+                // Full month day cells with indicator dots
+                LazyVGrid(columns: columns, spacing: 4) {
+                    ForEach(Array(monthCells.enumerated()), id: \.offset) { _, maybeDate in
+                        if let date = maybeDate {
+                            dayCell(date)
+                        } else {
+                            Color.clear.frame(height: 44)
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private func dayCell(_ date: LocalDate) -> some View {
+        let isSelected = date == selectedDate
+        let isToday = date == today
+        let marker = markers[date]
+        let dotColors = resolveDotColors(marker: marker, isSelected: isSelected)
+
+        return Button {
+            selectedDate = date
+        } label: {
+            VStack(spacing: 4) {
+                Text("\(date.day)")
+                    .font(.subheadline.weight(isSelected || isToday ? .bold : .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(
+                        isSelected
+                        ? Color.white
+                        : (isToday ? PLATokens.Colors.softBlueText : PLATokens.Colors.textPrimary)
+                    )
+
+                HStack(spacing: 3) {
+                    if dotColors.isEmpty {
+                        Circle()
+                            .fill(Color.clear)
+                            .frame(width: 4.5, height: 4.5)
+                    } else {
+                        ForEach(Array(dotColors.enumerated()), id: \.offset) { _, color in
+                            Circle()
+                                .fill(color)
+                                .frame(width: 4.5, height: 4.5)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(PLATokens.Colors.primaryBlue)
+                } else if isToday {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(PLATokens.Colors.softBlueTint)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel(for: date, marker: marker))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func resolveDotColors(marker: PLACalendarDayMarker?, isSelected: Bool) -> [Color] {
+        guard let marker else { return [] }
+        var colors: [Color] = []
+        if marker.hasUrgentOrOverdue {
+            colors.append(isSelected ? Color.white : PLATokens.Colors.danger)
+        }
+        if marker.taskCount > (marker.hasUrgentOrOverdue ? 1 : 0) {
+            colors.append(isSelected ? Color.white.opacity(0.92) : PLATokens.Colors.accent)
+        }
+        if marker.hasBillDue {
+            colors.append(isSelected ? Color.white.opacity(0.75) : PLATokens.Colors.warning)
+        }
+        return Array(colors.prefix(3))
+    }
+
+    private func accessibilityLabel(for date: LocalDate, marker: PLACalendarDayMarker?) -> String {
+        var parts = [PLAFormatters.fullDate(date)]
+        if let marker {
+            if marker.taskCount > 0 { parts.append("\(marker.taskCount) tugas") }
+            if marker.hasBillDue { parts.append("ada tagihan") }
+        }
+        return parts.joined(separator: ", ")
+    }
+}
+
+/// Actionable schedule conflict warning banner showing the colliding event, free time ranges, and 1-tap free slot pills.
+struct PLAScheduleConflictBanner: View {
+    let report: ScheduleConflictReport
+    let onSelectFreeTime: (Int) -> Void
+
+    private var conflictDescription: String {
+        let items = report.conflictingSlots.prefix(2).map { slot -> String in
+            let source = slot.isCalendarEvent ? " (Kalender)" : ""
+            return "\"\(slot.title)\"\(source) pukul \(PLAFormatters.time24(slot.startMinutes)) - \(PLAFormatters.time24(slot.endMinutes))"
+        }
+        let joined = items.joined(separator: " dan ")
+        return "Di \(PLAFormatters.shortDate(report.date)) kamu sudah ada \(joined)."
+    }
+
+    private var freeRangesText: String {
+        if report.freeWindows.isEmpty {
+            return "Jadwal hari ini penuh. Pertimbangkan geser ke hari lain."
+        }
+        let ranges = report.freeWindows.prefix(3).map {
+            "\(PLAFormatters.time24($0.startMinutes)) - \(PLAFormatters.time24($0.endMinutes))"
+        }
+        return "Kosong pada: \(ranges.joined(separator: ", "))"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
+            HStack(alignment: .top, spacing: PLATokens.Spacing.sm) {
+                Image(systemName: "calendar.badge.exclamationmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(PLATokens.Colors.warning)
+                    .padding(.top, 1)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Jadwal Bentrok")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(PLATokens.Colors.warning)
+                    Text(conflictDescription)
+                        .font(.footnote)
+                        .foregroundStyle(PLATokens.Colors.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(freeRangesText)
+                        .font(.caption)
+                        .foregroundStyle(PLATokens.Colors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if !report.suggestedStartMinutes.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Pindah ke jam kosong:")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(PLATokens.Colors.textSecondary)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: PLATokens.Spacing.xs) {
+                            ForEach(report.suggestedStartMinutes, id: \.self) { mins in
+                                Button {
+                                    onSelectFreeTime(mins)
+                                } label: {
+                                    Text(PLAFormatters.time24(mins))
+                                        .font(.caption.weight(.bold))
+                                        .monospacedDigit()
+                                        .foregroundStyle(PLATokens.Colors.softBlueText)
+                                        .padding(.horizontal, 14)
+                                        .frame(minHeight: PLATokens.minTouchTarget)
+                                        .background(PLATokens.Colors.softBlueTint, in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Pindah ke jam kosong pukul \(PLAFormatters.time24(mins))")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(PLATokens.Spacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: PLATokens.Radius.md, style: .continuous)
+                .fill(PLATokens.Colors.warning.opacity(0.10))
+        )
     }
 }
 

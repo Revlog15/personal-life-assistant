@@ -577,7 +577,11 @@ final class AppStore {
             try store.replaceReminders(forOwnerId: updated.id, ownerType: .task, reminders: rems)
             reloadAllData()
             _Concurrency.Task { await syncNotificationQueueNow() }
-            showToast("Dijadwalkan ke \(PLAFormatters.shortDate(newDate))")
+            if let newTimeMinutes {
+                showToast("Dijadwalkan ke \(PLAFormatters.shortDate(newDate)) pukul \(PLAFormatters.time24(newTimeMinutes))")
+            } else {
+                showToast("Dijadwalkan ke \(PLAFormatters.shortDate(newDate))")
+            }
         } catch {
             diagnostics.log(level: "ERROR", category: "Task", message: "Gagal menjadwalkan ulang: \(error.localizedDescription)")
         }
@@ -1084,7 +1088,7 @@ final class AppStore {
 
     // MARK: - Pasca-MVP Helpers (P-01, P-03, P-08, P-09)
 
-    func createTaskFromNaturalLanguage(_ phrase: String) {
+    func createTaskFromNaturalLanguage(_ phrase: String, overrideTimeMinutes: Int? = nil) {
         let parsed = NaturalLanguageTaskParser.parse(phrase, today: today, categories: categories)
         guard PLATask.isValidTitle(parsed.title) else { return }
         createOrUpdateTask(
@@ -1092,12 +1096,16 @@ final class AppStore {
             title: parsed.title,
             notes: nil,
             dueDate: parsed.dueDate,
-            dueTimeMinutes: parsed.dueTimeMinutes,
+            dueTimeMinutes: overrideTimeMinutes ?? parsed.dueTimeMinutes,
             priority: parsed.priority,
             categoryId: parsed.matchedCategoryId ?? defaultTaskCategory?.id,
             recurrenceRule: nil
         )
-        showToast("Tugas \"\(parsed.title)\" ditambahkan")
+        if let mins = overrideTimeMinutes {
+            showToast("Tugas \"\(parsed.title)\" dijadwalkan pukul \(PLAFormatters.time24(mins))")
+        } else {
+            showToast("Tugas \"\(parsed.title)\" ditambahkan")
+        }
     }
 
     func saveSavingsGoal(_ goal: SavingsGoal) {
@@ -1257,17 +1265,71 @@ final class AppStore {
             }
     }
 
-    /// Set of dates inside a given 7-day slice that have at least one active task scheduled.
-    func datesWithActiveTasks(in dates: [LocalDate]) -> Set<LocalDate> {
-        let set = Set(dates)
-        var result: Set<LocalDate> = []
-        for task in tasks where task.status == .active {
-            if let due = task.dueDateLocal, set.contains(due) {
-                result.insert(due)
-            }
-        }
-        return result
+    /// Active bills due (or with trial ending) on a specific local date.
+    func billsDue(on date: LocalDate) -> [Bill] {
+        activeBills
+            .filter { $0.effectiveDueOrTrialEndDate == date }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
+
+    /// Evaluates whether a proposed schedule date and time collides with active tasks or Apple Calendar events,
+    /// returning conflicting items plus free time windows and up to 4 1-tap suggested hours.
+    func evaluateScheduleConflict(
+        date: LocalDate,
+        startMinutes: Int,
+        excludingTaskId: UUID? = nil
+    ) -> ScheduleConflictReport {
+        let calSlots = settings.useCalendarForReschedule
+            ? calendarService.busySlots(on: date, timeZone: clock.timeZone)
+            : []
+        let dayStart = settings.quietHoursEnabled ? settings.quietEndMinutes : 7 * 60
+        let dayEnd = settings.quietHoursEnabled ? settings.quietStartMinutes : 22 * 60
+        let resolvedStart = dayStart < dayEnd ? dayStart : 7 * 60
+        let resolvedEnd = dayStart < dayEnd ? dayEnd : 22 * 60
+
+        return ScheduleConflictEngine.evaluate(
+            date: date,
+            startMinutes: startMinutes,
+            tasks: tasks,
+            excludingTaskId: excludingTaskId,
+            calendarBusySlots: calSlots,
+            dayStartMinutes: resolvedStart,
+            dayEndMinutes: resolvedEnd,
+            now: currentDateTime
+        )
+    }
+
+    /// Computes per-day indicator markers for a full month calendar grid (active tasks, high-priority/overdue tasks, and due bills).
+    func calendarMarkers(year: Int, month: Int) -> [LocalDate: PLACalendarDayMarker] {
+        var map: [LocalDate: PLACalendarDayMarker] = [:]
+        let now = currentDateTime
+
+        for task in tasks where task.status == .active {
+            guard let due = task.dueDateLocal, due.year == year, due.month == month else { continue }
+            var marker = map[due] ?? PLACalendarDayMarker()
+            marker.taskCount += 1
+            if task.priority == .high || task.isOverdue(at: now) {
+                marker.hasUrgentOrOverdue = true
+            }
+            map[due] = marker
+        }
+
+        for bill in activeBills {
+            let due = bill.effectiveDueOrTrialEndDate
+            guard due.year == year, due.month == month else { continue }
+            var marker = map[due] ?? PLACalendarDayMarker()
+            marker.hasBillDue = true
+            map[due] = marker
+        }
+
+        return map
+    }
+}
+
+struct PLACalendarDayMarker: Hashable {
+    var taskCount: Int = 0
+    var hasUrgentOrOverdue: Bool = false
+    var hasBillDue: Bool = false
 }
 
 struct PLADailyMetricPoint: Identifiable, Hashable {

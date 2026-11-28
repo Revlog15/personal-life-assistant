@@ -45,4 +45,32 @@ final class CalendarService {
         }
         return counts
     }
+
+    /// Reads non-all-day Apple Calendar busy time blocks on a specific date for conflict detection.
+    func busySlots(on date: LocalDate, timeZone: TimeZone) -> [BusyTimeSlot] {
+        refreshStatus()
+        guard isAuthorizedForRead else { return [] }
+
+        let startDate = date.toDate(minutesFromMidnight: 0, timeZone: timeZone)
+        let endDate = date.addingDays(1).toDate(minutesFromMidnight: 0, timeZone: timeZone)
+        let predicate = eventStore.predicateForEvents(withStart: startDate, end: endDate, calendars: nil)
+        let events = eventStore.events(matching: predicate)
+
+        return events.compactMap { event in
+            guard !event.isAllDay else { return nil }
+            let s = LocalDateTime.from(date: max(event.startDate, startDate), timeZone: timeZone)
+            let e = LocalDateTime.from(date: min(event.endDate, endDate), timeZone: timeZone)
+            let startMin = s.date == date ? s.minutesFromMidnight : 0
+            let endMin = e.date == date ? e.minutesFromMidnight : 1440
+            guard endMin > startMin else { return nil }
+            let title = (event.title?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 } ?? "Acara Kalender"
+            return BusyTimeSlot(
+                id: event.eventIdentifier ?? UUID().uuidString,
+                title: title,
+                startMinutes: startMin,
+                endMinutes: endMin,
+                isCalendarEvent: true
+            )
+        }
+    }
 }

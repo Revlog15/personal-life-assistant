@@ -19,7 +19,7 @@ enum TaskSegment: Int, CaseIterable, Identifiable {
 }
 
 /// Tasks tab (PRD §7.2, F-02..F-06): Calm reference-inspired layout with translucent Liquid Glass 4-tab bar,
-/// flat borderless 7-day calendar strip (shown only for Jadwal), minimalist 1-line Quick Add, and clean timeline rows.
+/// full monthly calendar grid with indicator dots (shown only for Jadwal), minimalist 1-line Quick Add, and clean timeline rows.
 struct TasksView: View {
     @Environment(AppStore.self) private var store
 
@@ -33,12 +33,6 @@ struct TasksView: View {
 
     private var activeDate: LocalDate {
         selectedDate ?? store.today
-    }
-
-    private var weekDatesAroundSelected: [LocalDate] {
-        let mondayOffset = -(activeDate.weekdayISO - 1)
-        let monday = activeDate.addingDays(mondayOffset)
-        return (0..<7).map { monday.addingDays($0) }
     }
 
     var body: some View {
@@ -66,13 +60,13 @@ struct TasksView: View {
                     )
 
                     if selectedSegment == .agenda {
-                        PLAWeekStripCalendar(
+                        PLAMonthCalendarView(
                             selectedDate: Binding(
                                 get: { activeDate },
                                 set: { selectedDate = $0 }
                             ),
                             today: store.today,
-                            activeTaskDates: store.datesWithActiveTasks(in: weekDatesAroundSelected)
+                            markers: store.calendarMarkers(year: activeDate.year, month: activeDate.month)
                         )
                     }
 
@@ -142,7 +136,7 @@ struct TasksView: View {
             .background(PLATokens.Colors.canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showAddSheet) {
-                TaskFormSheet()
+                TaskFormSheet(initialDate: selectedSegment == .agenda ? activeDate : nil)
                     .environment(store)
             }
             .sheet(item: $editingTask) { task in
@@ -206,6 +200,7 @@ struct TasksView: View {
     private var agendaContent: some View {
         let isTodaySelected = activeDate == store.today
         let scheduled = store.tasksScheduled(on: activeDate)
+        let billsOnDate = store.billsDue(on: activeDate)
 
         if isTodaySelected && !store.overdueTasks.isEmpty {
             VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
@@ -224,13 +219,13 @@ struct TasksView: View {
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             PLASectionHeader(title: isTodaySelected ? "Hari Ini" : PLAFormatters.fullDate(activeDate))
 
-            if scheduled.isEmpty {
+            if scheduled.isEmpty && billsOnDate.isEmpty {
                 if !isTodaySelected || store.overdueTasks.isEmpty {
                     PLAEmptyStateView(
                         title: isTodaySelected ? "Hari Ini Bersih" : "Belum Ada Jadwal",
                         message: isTodaySelected
                             ? "Tidak ada tugas jatuh tempo hari ini. Ketik cepat di atas atau tekan Tambah Tugas."
-                            : "Tidak ada tugas terjadwal pada \(PLAFormatters.shortDate(activeDate)).",
+                            : "Tidak ada tugas atau tagihan terjadwal pada \(PLAFormatters.shortDate(activeDate)).",
                         systemImage: "checkmark.seal.fill",
                         tint: PLATokens.Colors.accent
                     )
@@ -245,9 +240,43 @@ struct TasksView: View {
                     ForEach(scheduled) { task in
                         timelineAgendaRow(task, isOverdue: task.isOverdue(at: store.currentDateTime))
                     }
+
+                    if !billsOnDate.isEmpty {
+                        PLAGroupList {
+                            ForEach(Array(billsOnDate.enumerated()), id: \.element.id) { idx, bill in
+                                calendarBillRow(bill)
+                                if idx < billsOnDate.count - 1 {
+                                    PLAInsetDivider(leadingInset: 48)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private func calendarBillRow(_ bill: Bill) -> some View {
+        HStack(spacing: PLATokens.Spacing.md) {
+            PLAIconBadge(systemName: "creditcard.fill", color: PLATokens.Colors.warning, size: 32, iconFont: .caption.weight(.bold))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(bill.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(PLATokens.Colors.textPrimary)
+                Text(bill.isTrial ? "Akhir uji coba" : "Tagihan jatuh tempo")
+                    .font(.caption)
+                    .foregroundStyle(PLATokens.Colors.warning)
+            }
+
+            Spacer()
+
+            Text(store.isFinanceLocked ? PLAFormatters.maskedRupiah() : PLAFormatters.rupiah(bill.amount))
+                .font(.subheadline.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(PLATokens.Colors.textPrimary)
+        }
+        .padding(.vertical, 6)
     }
 
     @ViewBuilder

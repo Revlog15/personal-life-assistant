@@ -15,6 +15,11 @@ struct QuickAddNaturalBar: View {
         PLATask.isValidTitle(preview.title) && !phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private var conflictReport: ScheduleConflictReport? {
+        guard canSubmit, let due = preview.dueDate, let mins = preview.dueTimeMinutes else { return nil }
+        return store.evaluateScheduleConflict(date: due, startMinutes: mins)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: PLATokens.Spacing.sm) {
             HStack(spacing: PLATokens.Spacing.sm) {
@@ -91,6 +96,13 @@ struct QuickAddNaturalBar: View {
                         }
                     }
                     .padding(.horizontal, 4)
+                }
+
+                if let report = conflictReport, report.hasConflict {
+                    PLAScheduleConflictBanner(report: report) { freeMinutes in
+                        store.createTaskFromNaturalLanguage(phrase, overrideTimeMinutes: freeMinutes)
+                        phrase = ""
+                    }
                 }
             }
         }

@@ -7,6 +7,7 @@ struct TaskFormSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let editingTask: PLATask?
+    let initialDate: LocalDate?
 
     @State private var title: String
     @State private var notes: String
@@ -27,23 +28,25 @@ struct TaskFormSheet: View {
 
     @FocusState private var isTitleFocused: Bool
 
-    init(editingTask: PLATask? = nil) {
+    init(editingTask: PLATask? = nil, initialDate: LocalDate? = nil) {
         self.editingTask = editingTask
+        self.initialDate = initialDate
+        let seedDate = editingTask?.dueDateLocal ?? initialDate
         _title = State(initialValue: editingTask?.title ?? "")
         _notes = State(initialValue: editingTask?.notes ?? "")
-        _hasDueDate = State(initialValue: editingTask?.dueDateLocal != nil)
+        _hasDueDate = State(initialValue: seedDate != nil)
         let tz = TimeZone.current
-        if let due = editingTask?.dueDateLocal {
+        if let due = seedDate {
             _selectedDate = State(initialValue: due.toDate(minutesFromMidnight: 9 * 60, timeZone: tz))
         } else {
             _selectedDate = State(initialValue: Date())
         }
         _hasDueTime = State(initialValue: editingTask?.dueTimeMinutes != nil)
         if let mins = editingTask?.dueTimeMinutes {
-            let base = editingTask?.dueDateLocal ?? LocalDate.from(date: Date(), timeZone: tz)
+            let base = seedDate ?? LocalDate.from(date: Date(), timeZone: tz)
             _selectedTime = State(initialValue: base.toDate(minutesFromMidnight: mins, timeZone: tz))
         } else {
-            let base = LocalDate.from(date: Date(), timeZone: tz)
+            let base = seedDate ?? LocalDate.from(date: Date(), timeZone: tz)
             _selectedTime = State(initialValue: base.toDate(minutesFromMidnight: 9 * 60, timeZone: tz))
         }
         _priority = State(initialValue: editingTask?.priority ?? .medium)
@@ -69,6 +72,15 @@ struct TaskFormSheet: View {
         guard hasDueDate && hasDueTime else { return nil }
         let dt = LocalDateTime.from(date: selectedTime, timeZone: store.clock.timeZone)
         return dt.minutesFromMidnight
+    }
+
+    private var conflictReport: ScheduleConflictReport? {
+        guard let due = resolvedLocalDate, let mins = resolvedTimeMinutes else { return nil }
+        return store.evaluateScheduleConflict(
+            date: due,
+            startMinutes: mins,
+            excludingTaskId: editingTask?.id
+        )
     }
 
     var body: some View {
@@ -118,6 +130,13 @@ struct TaskFormSheet: View {
                         Toggle("Atur Jam Spesifik", isOn: $hasDueTime)
                         if hasDueTime {
                             DatePicker("Jam", selection: $selectedTime, displayedComponents: .hourAndMinute)
+                        }
+                        if let report = conflictReport, report.hasConflict {
+                            PLAScheduleConflictBanner(report: report) { freeMinutes in
+                                let base = resolvedLocalDate ?? store.today
+                                selectedTime = base.toDate(minutesFromMidnight: freeMinutes, timeZone: store.clock.timeZone)
+                            }
+                            .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
                         }
                     }
                 } header: {

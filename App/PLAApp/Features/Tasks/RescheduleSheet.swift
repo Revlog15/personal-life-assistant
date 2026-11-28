@@ -10,8 +10,18 @@ struct RescheduleSheet: View {
     let task: PLATask
 
     @State private var chosenDate: LocalDate
+    @State private var chosenTimeMinutes: Int?
     @State private var pickerDate: Date
     @State private var calendarCounts: [LocalDate: Int] = [:]
+
+    private var conflictReport: ScheduleConflictReport? {
+        guard let mins = chosenTimeMinutes else { return nil }
+        return store.evaluateScheduleConflict(
+            date: chosenDate,
+            startMinutes: mins,
+            excludingTaskId: task.id
+        )
+    }
 
     private var smartOptions: [SmartRescheduleOption] {
         RescheduleSuggester.smartOptionsInNext7Days(
@@ -37,6 +47,7 @@ struct RescheduleSheet: View {
         let today = LocalDate.from(date: Date(), timeZone: tz)
         let tomorrow = today.addingDays(1)
         _chosenDate = State(initialValue: tomorrow)
+        _chosenTimeMinutes = State(initialValue: task.dueTimeMinutes)
         _pickerDate = State(initialValue: tomorrow.toDate(minutesFromMidnight: 9 * 60, timeZone: tz))
     }
 
@@ -119,15 +130,25 @@ struct RescheduleSheet: View {
                     DatePicker("Pilih Tanggal Lain", selection: $pickerDate, displayedComponents: .date)
                         .onChange(of: pickerDate) { _, newValue in
                             chosenDate = LocalDate.from(date: newValue, timeZone: store.clock.timeZone)
+                            chosenTimeMinutes = task.dueTimeMinutes
                         }
+                }
+
+                if let report = conflictReport, report.hasConflict {
+                    Section {
+                        PLAScheduleConflictBanner(report: report) { freeMinutes in
+                            chosenTimeMinutes = freeMinutes
+                        }
+                        .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                    }
                 }
 
                 Section {
                     Button {
-                        store.rescheduleTask(task, to: chosenDate)
+                        store.rescheduleTask(task, to: chosenDate, newTimeMinutes: chosenTimeMinutes)
                         dismiss()
                     } label: {
-                        Text("Konfirmasi Pindah ke \(PLAFormatters.shortDate(chosenDate))")
+                        Text(confirmButtonTitle)
                             .font(.headline)
                             .frame(maxWidth: .infinity, minHeight: PLATokens.minTouchTarget)
                     }
@@ -163,8 +184,16 @@ struct RescheduleSheet: View {
         return parts.joined(separator: " • ")
     }
 
+    private var confirmButtonTitle: String {
+        if let mins = chosenTimeMinutes {
+            return "Konfirmasi Pindah ke \(PLAFormatters.shortDate(chosenDate)) (\(PLAFormatters.time24(mins)))"
+        }
+        return "Konfirmasi Pindah ke \(PLAFormatters.shortDate(chosenDate))"
+    }
+
     private func select(_ date: LocalDate) {
         chosenDate = date
+        chosenTimeMinutes = task.dueTimeMinutes
         pickerDate = date.toDate(minutesFromMidnight: 9 * 60, timeZone: store.clock.timeZone)
     }
 
