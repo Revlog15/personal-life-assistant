@@ -19,6 +19,15 @@
       "screenshotURLs": [],
       "versions": [
         {
+          "version": "2.6.1",
+          "buildVersion": "30",
+          "date": "2026-11-28",
+          "localizedDescription": "chore(launch): set developer splash slogan to BORN TO LEAD (v2.6.1)",
+          "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.6.1/PLAApp-2.6.1.ipa",
+          "size": 3744958,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "2.6.0",
           "buildVersion": "28",
           "date": "2026-11-28",
@@ -109,7 +118,7 @@
           "minOSVersion": "17.0"
         }
       ],
-      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.6.0/PLAApp-2.6.0.ipa"
+      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.6.1/PLAApp-2.6.1.ipa"
     }
   ],
   "news": []
