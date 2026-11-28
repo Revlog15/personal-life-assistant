@@ -19,6 +19,15 @@
       "screenshotURLs": [],
       "versions": [
         {
+          "version": "2.5.0",
+          "buildVersion": "26",
+          "date": "2026-11-28",
+          "localizedDescription": "fix(tasks): check financeLockEnabled and authService.isFinanceUnlocked for calendar bill row",
+          "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.5.0/PLAApp-2.5.0.ipa",
+          "size": 3239537,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "2.4.0",
           "buildVersion": "23",
           "date": "2026-11-28",
@@ -91,7 +100,7 @@
           "minOSVersion": "17.0"
         }
       ],
-      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.4.0/PLAApp-2.4.0.ipa"
+      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.5.0/PLAApp-2.5.0.ipa"
     }
   ],
   "news": []
