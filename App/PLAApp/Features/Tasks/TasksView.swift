@@ -271,7 +271,8 @@ struct TasksView: View {
 
             Spacer()
 
-            Text(store.isFinanceLocked ? PLAFormatters.maskedRupiah() : PLAFormatters.rupiah(bill.amount))
+            let isLocked = store.settings.financeLockEnabled && !store.authService.isFinanceUnlocked
+            Text(isLocked ? PLAFormatters.maskedRupiah() : PLAFormatters.rupiah(bill.amount))
                 .font(.subheadline.weight(.bold))
                 .monospacedDigit()
                 .foregroundStyle(PLATokens.Colors.textPrimary)
