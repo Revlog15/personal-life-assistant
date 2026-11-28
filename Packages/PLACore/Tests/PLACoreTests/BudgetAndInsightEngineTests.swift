@@ -307,4 +307,89 @@ final class BudgetAndInsightEngineTests: XCTestCase {
         let hugeExpense = [PLATransaction(type: .expense, amount: 750_000, accountId: accCash.id, categoryId: catFood.id, dateLocal: date)]
         XCTAssertEqual(AccountBalanceCalculator.balance(for: accCash, transactions: hugeExpense), -250_000)
     }
+
+    func testMidCycleRemainingBudgetCarryInAndNextCycleAutoReset() {
+        // Real user scenario: payday 25th, downloads app on Nov 28, normal monthly budget 1.500.000,
+        // enters remaining budget for this cycle = 1.150.000 (350.000 already spent on Nov 25-27).
+        let nov28 = LocalDate(year: 2026, month: 11, day: 28)!
+        let cycleStart = 25
+        let periodNov = BudgetPeriod.current(for: nov28, cycleStartDay: cycleStart)
+        XCTAssertEqual(periodNov.periodKey, "2026-11")
+        XCTAssertEqual(periodNov.currentDay, 4)
+        XCTAssertEqual(periodNov.remainingDaysInclusive, 27)
+
+        let opening = BudgetCalculator.openingSpent(
+            monthlyBudget: 1_500_000,
+            remainingForCurrentCycle: 1_150_000,
+            recordedExpense: 0
+        )
+        XCTAssertEqual(opening, 350_000)
+
+        var settings = UserSettings.default
+        settings.budgetCycleStartDay = cycleStart
+        settings.budgetOpeningSpentByPeriod[periodNov.periodKey] = opening
+
+        let budget = Budget(categoryId: nil, amount: 1_500_000, effectiveFromMonth: periodNov.periodKey)
+
+        // 1. Before any new transaction: totalBudget = 1.500.000, remaining = 1.150.000, safeDaily = floor(1.150.000 / 27) = 42.592
+        let initialSummary = BudgetCalculator.summarize(
+            today: nov28,
+            cycleStartDay: cycleStart,
+            transactions: [],
+            budgets: [budget],
+            bills: [],
+            categories: [catFood],
+            openingSpent: settings.openingSpent(for: periodNov.periodKey)
+        )
+        XCTAssertEqual(initialSummary.totalBudget, 1_500_000)
+        XCTAssertEqual(initialSummary.openingSpent, 350_000)
+        XCTAssertEqual(initialSummary.recordedExpense, 0)
+        XCTAssertEqual(initialSummary.totalExpense, 350_000)
+        XCTAssertEqual(initialSummary.remainingBudget, 1_150_000)
+        XCTAssertEqual(initialSummary.safeDailyLimit, 1_150_000 / 27)
+        XCTAssertEqual(initialSummary.netCashFlow, 0)
+
+        // 2. After logging Rp50.000 lunch on Nov 28: remaining drops to 1.100.000, account balance only deducts 50.000 (no double deduction!)
+        let lunchTx = PLATransaction(type: .expense, amount: 50_000, accountId: accCash.id, categoryId: catFood.id, dateLocal: nov28)
+        let afterLunch = BudgetCalculator.summarize(
+            today: nov28,
+            cycleStartDay: cycleStart,
+            transactions: [lunchTx],
+            budgets: [budget],
+            bills: [],
+            categories: [catFood],
+            openingSpent: settings.openingSpent(for: periodNov.periodKey)
+        )
+        XCTAssertEqual(afterLunch.recordedExpense, 50_000)
+        XCTAssertEqual(afterLunch.totalExpense, 400_000)
+        XCTAssertEqual(afterLunch.remainingBudget, 1_100_000)
+        XCTAssertEqual(afterLunch.safeDailyLimit, 1_100_000 / 27)
+        XCTAssertEqual(AccountBalanceCalculator.balance(for: accCash, transactions: [lunchTx]), 450_000)
+
+        // 3. Re-adjusting remaining budget later after recorded expenses: remaining 1.000.000 -> opening becomes 450.000
+        let updatedOpening = BudgetCalculator.openingSpent(
+            monthlyBudget: 1_500_000,
+            remainingForCurrentCycle: 1_000_000,
+            recordedExpense: 50_000
+        )
+        XCTAssertEqual(updatedOpening, 450_000)
+
+        // 4. Next payday (Dec 25): periodKey becomes "2026-12", openingSpent auto-resets to 0, full 1.500.000 restored!
+        let dec25 = LocalDate(year: 2026, month: 12, day: 25)!
+        let periodDec = BudgetPeriod.current(for: dec25, cycleStartDay: cycleStart)
+        XCTAssertEqual(periodDec.periodKey, "2026-12")
+        let nextCycleSummary = BudgetCalculator.summarize(
+            today: dec25,
+            cycleStartDay: cycleStart,
+            transactions: [lunchTx],
+            budgets: [budget],
+            bills: [],
+            categories: [catFood],
+            openingSpent: settings.openingSpent(for: periodDec.periodKey)
+        )
+        XCTAssertEqual(nextCycleSummary.openingSpent, 0)
+        XCTAssertEqual(nextCycleSummary.totalBudget, 1_500_000)
+        XCTAssertEqual(nextCycleSummary.totalExpense, 0)
+        XCTAssertEqual(nextCycleSummary.remainingBudget, 1_500_000)
+    }
 }

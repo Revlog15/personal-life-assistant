@@ -76,8 +76,12 @@ public struct CategorySpendingSummary: Identifiable, Hashable, Sendable {
 public struct FinancialPeriodSummary: Equatable, Sendable {
     public let period: BudgetPeriod
     public let totalIncome: Int64
-    /// E_total (expense transactions in period up to today; transfers excluded)
+    /// E_total (recorded expenses in period up to today + optional mid-cycle openingSpent; transfers excluded)
     public let totalExpense: Int64
+    /// Mid-cycle opening carry-in spend before the user started tracking this cycle (>= 0)
+    public let openingSpent: Int64
+    /// Pure recorded expense transactions in this period (excludes openingSpent)
+    public var recordedExpense: Int64 { max(Int64(0), totalExpense - openingSpent) }
     /// E_bill_paid (portion of totalExpense linked to a bill)
     public let paidBillsExpense: Int64
     /// E_bill_due (unpaid active bills due within this period)
@@ -85,7 +89,7 @@ public struct FinancialPeriodSummary: Equatable, Sendable {
     /// E_var = E_total - E_bill_paid
     public let variableExpense: Int64
     public let expenseTransactionCount: Int
-    /// Net cash flow = totalIncome - totalExpense
+    /// Net cash flow = totalIncome - recordedExpense
     public let netCashFlow: Int64
     /// B (nil or <= 0 means budget not set)
     public let totalBudget: Int64?
@@ -176,13 +180,28 @@ public enum AccountBalanceCalculator {
 
 /// Deterministic Financial & Forecast Calculator matching PRD §10.1 formulas to the exact rupiah.
 public enum BudgetCalculator {
+    /// Computes the non-negative mid-cycle opening spend carry-in from a user-entered remaining budget.
+    /// Example: monthlyBudget 1.500.000, remainingForCurrentCycle 1.150.000, recordedExpense 0 -> returns 350.000.
+    public static func openingSpent(
+        monthlyBudget: Int64,
+        remainingForCurrentCycle: Int64,
+        recordedExpense: Int64 = 0
+    ) -> Int64 {
+        let clampedBudget = max(Int64(0), monthlyBudget)
+        let clampedRemaining = max(Int64(0), remainingForCurrentCycle)
+        let clampedRecorded = max(Int64(0), recordedExpense)
+        let targetTotalSpent = max(Int64(0), clampedBudget - clampedRemaining)
+        return max(Int64(0), targetTotalSpent - clampedRecorded)
+    }
+
     public static func summarize(
         today: LocalDate,
         cycleStartDay: Int,
         transactions: [PLATransaction],
         budgets: [Budget],
         bills: [Bill],
-        categories: [PLACategory]
+        categories: [PLACategory],
+        openingSpent: Int64 = 0
     ) -> FinancialPeriodSummary {
         let period = BudgetPeriod.current(for: today, cycleStartDay: cycleStartDay)
         return summarize(
@@ -191,7 +210,8 @@ public enum BudgetCalculator {
             transactions: transactions,
             budgets: budgets,
             bills: bills,
-            categories: categories
+            categories: categories,
+            openingSpent: openingSpent
         )
     }
 
@@ -201,12 +221,14 @@ public enum BudgetCalculator {
         transactions: [PLATransaction],
         budgets: [Budget],
         bills: [Bill],
-        categories: [PLACategory]
+        categories: [PLACategory],
+        openingSpent: Int64 = 0
     ) -> FinancialPeriodSummary {
         let effectiveEnd = min(asOfDate, period.end)
+        let cleanOpening = max(Int64(0), openingSpent)
 
         var totalIncome: Int64 = 0
-        var totalExpense: Int64 = 0
+        var recordedExpense: Int64 = 0
         var paidBillsExpense: Int64 = 0
         var expenseCount = 0
 
@@ -220,7 +242,7 @@ public enum BudgetCalculator {
             case .income:
                 totalIncome += tx.amount
             case .expense:
-                totalExpense += tx.amount
+                recordedExpense += tx.amount
                 expenseCount += 1
                 if tx.billId != nil {
                     paidBillsExpense += tx.amount
@@ -242,8 +264,10 @@ public enum BudgetCalculator {
             .filter { $0.isActive && $0.nextDueDateLocal <= period.end }
             .reduce(Int64(0)) { $0 + $1.amount }
 
+        let totalExpense = recordedExpense + cleanOpening
         let variableExpense = max(Int64(0), totalExpense - paidBillsExpense)
-        let netCashFlow = totalIncome - totalExpense
+        let recordedVariableExpense = max(Int64(0), recordedExpense - paidBillsExpense)
+        let netCashFlow = totalIncome - recordedExpense
 
         // Resolve effective budgets for period.periodKey (latest effectiveFromMonth <= periodKey)
         let activeTotalBudget = resolveEffectiveBudget(categoryId: nil, periodKey: period.periodKey, budgets: budgets)
@@ -312,7 +336,7 @@ public enum BudgetCalculator {
             } else {
                 status = .notSet
             }
-            let pctOfVar = variableExpense > 0 ? Double(varSpent) / Double(variableExpense) : 0
+            let pctOfVar = recordedVariableExpense > 0 ? Double(varSpent) / Double(recordedVariableExpense) : 0
             categorySummaries.append(CategorySpendingSummary(
                 id: catId,
                 categoryName: catMap[catId]?.name ?? "Kategori",
@@ -336,6 +360,7 @@ public enum BudgetCalculator {
             period: period,
             totalIncome: totalIncome,
             totalExpense: totalExpense,
+            openingSpent: cleanOpening,
             paidBillsExpense: paidBillsExpense,
             unpaidBillsDue: unpaidBillsDue,
             variableExpense: variableExpense,

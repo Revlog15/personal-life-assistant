@@ -227,7 +227,7 @@ struct FinanceView: View {
         PLAChartHeroCard(
             title: "Tren Pengeluaran",
             subtitle: "\(PLAFormatters.periodRange(s.period)) • Hari \(s.period.currentDay)/\(s.period.totalDays)",
-            totalAmount: chartRange == .cycle ? s.totalExpense : rangeTotal,
+            totalAmount: chartRange == .cycle ? s.recordedExpense : rangeTotal,
             points: points,
             selectedRange: $chartRange,
             status: s.budgetStatus,
@@ -316,6 +316,13 @@ struct FinanceView: View {
                             value: PLAFormatters.rupiah(s.remainingBudget ?? 0),
                             valueColor: (s.remainingBudget ?? 0) < 0 ? PLATokens.Colors.danger : PLATokens.Colors.textPrimary
                         )
+                        if s.openingSpent > 0 {
+                            summaryLine(
+                                label: "Terpakai Sebelum Mulai",
+                                value: PLAFormatters.rupiah(s.openingSpent),
+                                valueColor: PLATokens.Colors.textSecondary
+                            )
+                        }
                         summaryLine(
                             label: "Batas Aman/Hari (\(s.period.remainingDaysInclusive) hari)",
                             value: PLAFormatters.rupiah(s.safeDailyLimit ?? 0),

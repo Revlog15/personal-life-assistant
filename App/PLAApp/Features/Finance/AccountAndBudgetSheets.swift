@@ -127,7 +127,8 @@ struct AccountFormSheet: View {
     }
 }
 
-/// Set/Edit Total or Per-Category Monthly Budget sheet (F-09 / AC-09.1).
+/// Set/Edit Total or Per-Category Monthly Budget sheet (F-09 / AC-09.1),
+/// supporting mid-cycle remaining budget carry-in for Total Monthly Budget without double-deducting wallet balances.
 struct BudgetFormSheet: View {
     @Environment(AppStore.self) private var store
     @Environment(\.dismiss) private var dismiss
@@ -136,23 +137,89 @@ struct BudgetFormSheet: View {
     let currentAmount: Int64?
 
     @State private var amountText: String
+    @State private var cycleStartDay: Int = 1
+    @State private var remainingCycleText: String = ""
+    @State private var didInitializeMidCycleState = false
 
     init(category: PLACategory?, currentAmount: Int64?) {
         self.category = category
         self.currentAmount = currentAmount
-        _amountText = State(initialValue: currentAmount.map { String($0) } ?? "")
+        _amountText = State(initialValue: currentAmount.map { PLAFormatters.groupedInteger($0) } ?? "")
     }
 
     private var parsedResult: Result<Money, AmountParseError> {
         AmountParser.parse(amountText)
     }
 
+    private var parsedBudgetAmount: Int64? {
+        if case .success(let money) = parsedResult { return money.rupiah }
+        return nil
+    }
+
+    private var previewPeriod: BudgetPeriod {
+        BudgetPeriod.current(for: store.today, cycleStartDay: cycleStartDay)
+    }
+
+    private var recordedExpenseInPreviewPeriod: Int64 {
+        BudgetCalculator.summarize(
+            period: previewPeriod,
+            asOfDate: store.today,
+            transactions: store.transactions,
+            budgets: [],
+            bills: [],
+            categories: store.categories,
+            openingSpent: 0
+        ).recordedExpense
+    }
+
+    private var parsedRemainingCycle: Int64? {
+        let trimmed = remainingCycleText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if trimmed == "0" { return 0 }
+        if case .success(let money) = AmountParser.parse(trimmed) {
+            return money.rupiah
+        }
+        return nil
+    }
+
+    private var maxAllowedRemaining: Int64? {
+        guard let b = parsedBudgetAmount else { return nil }
+        return max(Int64(0), b - recordedExpenseInPreviewPeriod)
+    }
+
+    private var remainingErrorMessage: String? {
+        guard category == nil, let rem = parsedRemainingCycle, let maxRem = maxAllowedRemaining else { return nil }
+        if rem > maxRem {
+            if recordedExpenseInPreviewPeriod > 0 {
+                return "Sisa maksimal saat ini \(PLAFormatters.rupiah(maxRem)) (setelah \(PLAFormatters.rupiah(recordedExpenseInPreviewPeriod)) pengeluaran tercatat)."
+            }
+            return "Sisa anggaran siklus ini tidak boleh melebihi batas bulanan normal."
+        }
+        return nil
+    }
+
+    private var canSave: Bool {
+        guard parsedBudgetAmount != nil else { return false }
+        return remainingErrorMessage == nil
+    }
+
     var body: some View {
         NavigationStack {
             Form {
+                if category == nil {
+                    Section {
+                        Stepper("Tanggal Mulai Siklus: Tanggal \(cycleStartDay)", value: $cycleStartDay, in: 1...28)
+                        Text("Siklus aktif: \(PLAFormatters.periodRange(previewPeriod)) • Hari ke-\(previewPeriod.currentDay)/\(previewPeriod.totalDays)")
+                            .font(.caption)
+                            .foregroundStyle(PLATokens.Colors.textSecondary)
+                    } header: {
+                        Text("Siklus Gajian")
+                    }
+                }
+
                 Section {
                     RupiahTextField(
-                        placeholder: "Contoh: 3.000.000",
+                        placeholder: "Contoh: 1.500.000",
                         text: $amountText,
                         font: .title3.weight(.bold),
                         accentColor: PLATokens.Colors.accent
@@ -160,7 +227,7 @@ struct BudgetFormSheet: View {
 
                     switch parsedResult {
                     case .success(let money):
-                        Text("Batas periode aktif: \(PLAFormatters.rupiah(money.rupiah))")
+                        Text("Batas normal bulanan: \(PLAFormatters.rupiah(money.rupiah))")
                             .font(.caption)
                             .foregroundStyle(PLATokens.Colors.accent)
                     case .failure(let err):
@@ -173,7 +240,39 @@ struct BudgetFormSheet: View {
                 } header: {
                     Text(category == nil ? "Anggaran Total Bulanan" : "Anggaran Kategori: \(category?.name ?? "")")
                 } footer: {
-                    Text("Berlaku mulai periode \(store.activePeriod.periodKey) ke depan tanpa mengubah histori bulan sebelumnya.")
+                    Text("Berlaku mulai periode \(previewPeriod.periodKey) ke depan tanpa mengubah histori bulan sebelumnya.")
+                }
+
+                if category == nil, let monthly = parsedBudgetAmount {
+                    Section {
+                        RupiahTextField(
+                            placeholder: "Kosongkan jika masih utuh",
+                            text: $remainingCycleText,
+                            allowZero: true,
+                            font: .body.weight(.bold),
+                            accentColor: PLATokens.Colors.accent
+                        )
+
+                        if let err = remainingErrorMessage {
+                            Text(err)
+                                .font(.caption)
+                                .foregroundStyle(PLATokens.Colors.danger)
+                        } else if let rem = parsedRemainingCycle {
+                            let opening = BudgetCalculator.openingSpent(
+                                monthlyBudget: monthly,
+                                remainingForCurrentCycle: rem,
+                                recordedExpense: recordedExpenseInPreviewPeriod
+                            )
+                            let daily = rem > 0 ? rem / Int64(max(previewPeriod.remainingDaysInclusive, 1)) : 0
+                            Text("Penyesuaian awal siklus: \(PLAFormatters.rupiah(opening)) • Batas aman \(PLAFormatters.rupiah(daily))/hari (\(previewPeriod.remainingDaysInclusive) hari tersisa). Siklus depan otomatis kembali penuh \(PLAFormatters.rupiah(monthly)).")
+                                .font(.caption)
+                                .foregroundStyle(PLATokens.Colors.accent)
+                        }
+                    } header: {
+                        Text("Sisa Anggaran Siklus Ini (Opsional)")
+                    } footer: {
+                        Text("Jika baru mulai mencatat di tengah siklus gajian, ketik sisa anggaran yang masih tersedia sekarang. Saldo akun tidak ikut terpotong.")
+                    }
                 }
 
                 if currentAmount != nil,
@@ -190,6 +289,17 @@ struct BudgetFormSheet: View {
                     }
                 }
             }
+            .onAppear {
+                guard !didInitializeMidCycleState else { return }
+                didInitializeMidCycleState = true
+                cycleStartDay = store.settings.budgetCycleStartDay
+                if category == nil {
+                    let s = store.financialSummary
+                    if s.openingSpent > 0, let rem = s.remainingBudget {
+                        remainingCycleText = PLAFormatters.groupedInteger(max(Int64(0), rem))
+                    }
+                }
+            }
             .navigationTitle(category == nil ? "Anggaran Bulanan" : category!.name)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -198,18 +308,37 @@ struct BudgetFormSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Simpan") {
-                        if case .success(let money) = parsedResult {
-                            store.saveBudget(categoryId: category?.id, amount: money.rupiah)
-                            dismiss()
-                        }
+                        save()
                     }
                     .fontWeight(.semibold)
-                    .disabled({
-                        if case .success = parsedResult { return false }
-                        return true
-                    }())
+                    .disabled(!canSave)
                 }
             }
         }
+    }
+
+    private func save() {
+        guard let monthly = parsedBudgetAmount, remainingErrorMessage == nil else { return }
+        if category == nil {
+            let opening: Int64
+            if let rem = parsedRemainingCycle {
+                opening = BudgetCalculator.openingSpent(
+                    monthlyBudget: monthly,
+                    remainingForCurrentCycle: rem,
+                    recordedExpense: recordedExpenseInPreviewPeriod
+                )
+            } else {
+                opening = 0
+            }
+            store.saveBudget(
+                categoryId: nil,
+                amount: monthly,
+                cycleStartDay: cycleStartDay,
+                openingSpentForCurrentPeriod: opening
+            )
+        } else {
+            store.saveBudget(categoryId: category?.id, amount: monthly)
+        }
+        dismiss()
     }
 }

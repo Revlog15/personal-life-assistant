@@ -108,13 +108,15 @@ final class AppStore {
     }
 
     var financialSummary: FinancialPeriodSummary {
-        BudgetCalculator.summarize(
+        let period = activePeriod
+        return BudgetCalculator.summarize(
             today: today,
             cycleStartDay: settings.budgetCycleStartDay,
             transactions: transactions,
             budgets: budgets,
             bills: bills,
-            categories: categories
+            categories: categories,
+            openingSpent: settings.openingSpent(for: period.periodKey)
         )
     }
 
@@ -356,22 +358,44 @@ final class AppStore {
 
     // MARK: - Onboarding (F-15)
 
-    func completeOnboarding(cashBalance: Int64, bankBalance: Int64, monthlyBudget: Int64?) {
+    func completeOnboarding(
+        cashBalance: Int64,
+        bankBalance: Int64,
+        monthlyBudget: Int64?,
+        budgetCycleStartDay: Int = 1,
+        remainingBudgetForCurrentCycle: Int64? = nil
+    ) {
         guard let store else { return }
         do {
             try store.ensureDefaultCategoriesExist()
             try store.ensureDefaultAccountsExist(cashBalance: cashBalance, bankBalance: bankBalance, now: clock.now)
 
+            settings.budgetCycleStartDay = min(max(budgetCycleStartDay, 1), 28)
+            let period = BudgetPeriod.current(for: today, cycleStartDay: settings.budgetCycleStartDay)
+
             if let monthlyBudget, monthlyBudget > 0 {
                 let budget = Budget(
                     categoryId: nil,
                     amount: monthlyBudget,
-                    effectiveFromMonth: activePeriod.periodKey,
+                    effectiveFromMonth: period.periodKey,
                     isActive: true,
                     createdAt: clock.now,
                     updatedAt: clock.now
                 )
                 try store.saveBudget(budget)
+
+                if let remaining = remainingBudgetForCurrentCycle {
+                    let opening = BudgetCalculator.openingSpent(
+                        monthlyBudget: monthlyBudget,
+                        remainingForCurrentCycle: remaining,
+                        recordedExpense: 0
+                    )
+                    if opening > 0 {
+                        settings.budgetOpeningSpentByPeriod[period.periodKey] = opening
+                    } else {
+                        settings.budgetOpeningSpentByPeriod.removeValue(forKey: period.periodKey)
+                    }
+                }
             }
 
             settings.hasCompletedOnboarding = true
@@ -721,8 +745,16 @@ final class AppStore {
         }
     }
 
-    func saveBudget(categoryId: UUID?, amount: Int64) {
+    func saveBudget(
+        categoryId: UUID?,
+        amount: Int64,
+        cycleStartDay: Int? = nil,
+        openingSpentForCurrentPeriod: Int64? = nil
+    ) {
         guard let store, amount > 0 else { return }
+        if categoryId == nil, let cycleStartDay {
+            settings.budgetCycleStartDay = min(max(cycleStartDay, 1), 28)
+        }
         let periodKey = activePeriod.periodKey
         let existing = budgets.first { $0.categoryId == categoryId && $0.effectiveFromMonth == periodKey }
         let budget = Budget(
@@ -736,6 +768,16 @@ final class AppStore {
         )
         do {
             try store.saveBudget(budget)
+            if categoryId == nil, let opening = openingSpentForCurrentPeriod {
+                if opening > 0 {
+                    settings.budgetOpeningSpentByPeriod[periodKey] = opening
+                } else {
+                    settings.budgetOpeningSpentByPeriod.removeValue(forKey: periodKey)
+                }
+            }
+            if categoryId == nil && (cycleStartDay != nil || openingSpentForCurrentPeriod != nil) {
+                settingsStore.saveSettings(settings)
+            }
             reloadAllData()
             showToast("Anggaran diperbarui")
         } catch {
@@ -745,8 +787,13 @@ final class AppStore {
 
     func deleteBudget(id: UUID) {
         guard let store else { return }
+        let isTotal = budgets.first(where: { $0.id == id })?.categoryId == nil
         do {
             try store.deleteBudget(id: id)
+            if isTotal {
+                settings.budgetOpeningSpentByPeriod.removeValue(forKey: activePeriod.periodKey)
+                settingsStore.saveSettings(settings)
+            }
             reloadAllData()
         } catch {
             diagnostics.log(level: "ERROR", category: "Budget", message: "Gagal menghapus anggaran: \(error.localizedDescription)")

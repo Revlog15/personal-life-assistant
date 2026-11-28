@@ -1,15 +1,42 @@
 import SwiftUI
 import PLACore
 
-/// 3-step skippable onboarding (PRD F-15 / AC-15.1 & AC-15.2) in cohesive White & Blue with dot-formatted Rupiah inputs.
+/// 3-step skippable onboarding (PRD F-15 / AC-15.1 & AC-15.2) in cohesive White & Blue with dot-formatted Rupiah inputs,
+/// payday cycle selector, and optional mid-cycle remaining budget adjustment.
 struct OnboardingView: View {
     @Environment(AppStore.self) private var store
 
     @State private var step: Int = 0
     @State private var cashText: String = ""
     @State private var bankText: String = ""
+    @State private var cycleStartDay: Int = 1
     @State private var budgetText: String = ""
+    @State private var remainingCycleText: String = ""
     @State private var notificationRequested: Bool = false
+
+    private var previewPeriod: BudgetPeriod {
+        BudgetPeriod.current(for: store.today, cycleStartDay: cycleStartDay)
+    }
+
+    private var parsedMonthlyBudget: Int64? {
+        parseOptionalAmount(budgetText, allowZero: false)
+    }
+
+    private var parsedRemainingCycle: Int64? {
+        parseOptionalAmount(remainingCycleText, allowZero: true)
+    }
+
+    private var remainingExceedsMonthly: Bool {
+        guard let monthly = parsedMonthlyBudget, let rem = parsedRemainingCycle else { return false }
+        return rem > monthly
+    }
+
+    private var canAdvanceFromCurrentStep: Bool {
+        if step == 1 && remainingExceedsMonthly {
+            return false
+        }
+        return true
+    }
 
     var body: some View {
         NavigationStack {
@@ -48,7 +75,10 @@ struct OnboardingView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: PLATokens.Spacing.sm) {
-                    PLAPrimaryPillButton(title: step < 2 ? "Lanjut" : "Mulai Gunakan PLA") {
+                    PLAPrimaryPillButton(
+                        title: step < 2 ? "Lanjut" : "Mulai Gunakan PLA",
+                        isDisabled: !canAdvanceFromCurrentStep
+                    ) {
                         if step < 2 {
                             step += 1
                         } else {
@@ -135,9 +165,9 @@ struct OnboardingView: View {
                 )
             }
         } header: {
-            Text("Saldo Awal (Opsional)")
+            Text("Saldo Riil Saat Ini (Opsional)")
         } footer: {
-            Text("Akun E-wallet dan rekening tambahan dapat ditambahkan kapan saja di tab Keuangan.")
+            Text("Masukkan saldo yang ada di tangan dan rekening hari ini. Akun E-wallet dapat ditambahkan kapan saja di tab Keuangan.")
         }
     }
 
@@ -158,7 +188,7 @@ struct OnboardingView: View {
                         Text("Kontrol Belanja Otomatis")
                             .font(.headline)
                             .foregroundStyle(Color.white)
-                        Text("PLA menghitung batas aman harian dan proyeksi akhir bulan secara deterministik.")
+                        Text("PLA menghitung batas aman harian dan proyeksi akhir siklus secara deterministik.")
                             .font(.footnote)
                             .foregroundStyle(Color.white.opacity(0.86))
                     }
@@ -169,21 +199,60 @@ struct OnboardingView: View {
         }
 
         Section {
+            Stepper("Tanggal Gajian / Siklus: Tanggal \(cycleStartDay)", value: $cycleStartDay, in: 1...28)
+            Text("Siklus aktif: \(PLAFormatters.periodRange(previewPeriod)) • Hari ke-\(previewPeriod.currentDay)/\(previewPeriod.totalDays)")
+                .font(.caption)
+                .foregroundStyle(PLATokens.Colors.textSecondary)
+        } header: {
+            Text("Tanggal Mulai Siklus")
+        }
+
+        Section {
             RupiahTextField(
-                placeholder: "Contoh: 3.000.000",
+                placeholder: "Contoh: 1.500.000",
                 text: $budgetText,
                 font: .title3.weight(.bold),
                 accentColor: PLATokens.Colors.accent
             )
-            if let parsed = parseOptionalPositiveAmount(budgetText) {
-                Text("Batas bulanan: \(PLAFormatters.rupiah(parsed))")
+            if let parsed = parsedMonthlyBudget {
+                Text("Batas bulanan normal: \(PLAFormatters.rupiah(parsed))")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(PLATokens.Colors.accent)
             }
         } header: {
-            Text("Batas Anggaran Total (Opsional)")
-        } footer: {
-            Text("Siklus default dimulai tanggal 1 setiap bulan. Anda dapat mengubah ke tanggal gajian (1-28) di Pengaturan.")
+            Text("Anggaran Bulanan Normal (Opsional)")
+        }
+
+        if let monthly = parsedMonthlyBudget {
+            Section {
+                RupiahTextField(
+                    placeholder: "Kosongkan jika masih utuh",
+                    text: $remainingCycleText,
+                    allowZero: true,
+                    font: .body.weight(.bold),
+                    accentColor: PLATokens.Colors.accent
+                )
+
+                if remainingExceedsMonthly {
+                    Text("Sisa anggaran siklus ini tidak boleh melebihi batas bulanan normal (\(PLAFormatters.rupiah(monthly))).")
+                        .font(.caption)
+                        .foregroundStyle(PLATokens.Colors.danger)
+                } else if let rem = parsedRemainingCycle {
+                    let alreadySpent = BudgetCalculator.openingSpent(
+                        monthlyBudget: monthly,
+                        remainingForCurrentCycle: rem,
+                        recordedExpense: 0
+                    )
+                    let daily = rem > 0 ? rem / Int64(max(previewPeriod.remainingDaysInclusive, 1)) : 0
+                    Text("Sudah terpakai \(PLAFormatters.rupiah(alreadySpent)) • Batas aman \(PLAFormatters.rupiah(daily))/hari untuk \(previewPeriod.remainingDaysInclusive) hari tersisa. Siklus depan otomatis kembali penuh \(PLAFormatters.rupiah(monthly)).")
+                        .font(.caption)
+                        .foregroundStyle(PLATokens.Colors.accent)
+                }
+            } header: {
+                Text("Sisa Anggaran Siklus Ini (Opsional)")
+            } footer: {
+                Text("Misal gajian tanggal \(cycleStartDay) tetapi baru mulai mencatat hari ini: cukup ketik sisa anggaran yang masih tersedia. Saldo dompet awal tidak ikut terpotong.")
+            }
         }
     }
 
@@ -229,18 +298,27 @@ struct OnboardingView: View {
         }
     }
 
-    private func parseOptionalPositiveAmount(_ raw: String) -> Int64? {
-        guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
-        if case .success(let money) = AmountParser.parse(raw) {
+    private func parseOptionalAmount(_ raw: String, allowZero: Bool) -> Int64? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        if allowZero && trimmed == "0" { return 0 }
+        if case .success(let money) = AmountParser.parse(trimmed) {
             return money.rupiah
         }
         return nil
     }
 
     private func finishOnboarding() {
-        let cash = parseOptionalPositiveAmount(cashText) ?? 0
-        let bank = parseOptionalPositiveAmount(bankText) ?? 0
-        let budget = parseOptionalPositiveAmount(budgetText)
-        store.completeOnboarding(cashBalance: cash, bankBalance: bank, monthlyBudget: budget)
+        let cash = parseOptionalAmount(cashText, allowZero: false) ?? 0
+        let bank = parseOptionalAmount(bankText, allowZero: false) ?? 0
+        let budget = parsedMonthlyBudget
+        let remaining = (budget != nil && !remainingExceedsMonthly) ? parsedRemainingCycle : nil
+        store.completeOnboarding(
+            cashBalance: cash,
+            bankBalance: bank,
+            monthlyBudget: budget,
+            budgetCycleStartDay: cycleStartDay,
+            remainingBudgetForCurrentCycle: remaining
+        )
     }
 }

@@ -115,7 +115,7 @@ struct DashboardView: View {
         return PLAChartHeroCard(
             title: "Pengeluaran Harian",
             subtitle: subtitle,
-            totalAmount: chartRange == .cycle ? summary.totalExpense : rangeTotal,
+            totalAmount: chartRange == .cycle ? summary.recordedExpense : rangeTotal,
             points: points,
             selectedRange: $chartRange,
             status: summary.budgetStatus,

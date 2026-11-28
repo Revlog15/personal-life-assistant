@@ -16,7 +16,7 @@ def main() -> None:
     parser.add_argument("--min-os", default="17.0")
     parser.add_argument(
         "--notes",
-        default="Rilis Personal Life Assistant v2.3.1: penyederhanaan hirarki dan kepadatan UI (Beranda 3 lapis, Tugas dengan kalender flat & Quick Add minimalis 1 baris, Keuangan 4 segmen penuh Liquid Glass + Dompet terpadu, persistensi state antar tab, dan seluruh kontrol >= 44pt).",
+        default="Rilis Personal Life Assistant v2.4.0: dukungan mulai di tengah siklus gajian (pilih tanggal gajian 1-28 di Onboarding & Atur Anggaran, cukup ketik Sisa Anggaran Siklus Ini tanpa memotong saldo dompet dan otomatis kembali penuh di siklus berikutnya).",
     )
     args = parser.parse_args()
 

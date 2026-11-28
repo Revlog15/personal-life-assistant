@@ -647,8 +647,15 @@ public struct UserSettings: Hashable, Codable, Sendable {
     public var extraEarlyReminderDaysByCategory: [String: Int]
     /// P-08: Whether Smart Rescheduling includes read-only Apple Calendar event counts.
     public var useCalendarForReschedule: Bool
+    /// Mid-cycle onboarding carry-in spend per budget periodKey ("YYYY-MM") so users joining mid-cycle
+    /// can type their remaining budget without altering wallet balances or overwriting next month's full budget.
+    public var budgetOpeningSpentByPeriod: [String: Int64]
 
     public static let `default` = UserSettings()
+
+    public func openingSpent(for periodKey: String) -> Int64 {
+        max(Int64(0), budgetOpeningSpentByPeriod[periodKey] ?? 0)
+    }
 
     public init(
         quietHoursEnabled: Bool = true,
@@ -668,7 +675,8 @@ public struct UserSettings: Hashable, Codable, Sendable {
         hasCompletedOnboarding: Bool = false,
         preferredReminderMinutes: Int? = nil,
         extraEarlyReminderDaysByCategory: [String: Int] = [:],
-        useCalendarForReschedule: Bool = false
+        useCalendarForReschedule: Bool = false,
+        budgetOpeningSpentByPeriod: [String: Int64] = [:]
     ) {
         self.quietHoursEnabled = quietHoursEnabled
         self.quietStartMinutes = min(max(quietStartMinutes, 0), 1439)
@@ -688,13 +696,15 @@ public struct UserSettings: Hashable, Codable, Sendable {
         self.preferredReminderMinutes = preferredReminderMinutes.map { min(max($0, 0), 1439) }
         self.extraEarlyReminderDaysByCategory = extraEarlyReminderDaysByCategory
         self.useCalendarForReschedule = useCalendarForReschedule
+        self.budgetOpeningSpentByPeriod = budgetOpeningSpentByPeriod
     }
 
     private enum CodingKeys: String, CodingKey {
         case quietHoursEnabled, quietStartMinutes, quietEndMinutes, morningDigestEnabled, morningDigestMinutes,
              budgetCycleStartDay, financeLockEnabled, showBudgetStatusWhenLocked, autoLockTimeout,
              reminderPreferences, defaultTaskSound, urgentTaskSound, billSound, digestSound, hasCompletedOnboarding,
-             preferredReminderMinutes, extraEarlyReminderDaysByCategory, useCalendarForReschedule
+             preferredReminderMinutes, extraEarlyReminderDaysByCategory, useCalendarForReschedule,
+             budgetOpeningSpentByPeriod
     }
 
     public init(from decoder: Decoder) throws {
@@ -717,5 +727,6 @@ public struct UserSettings: Hashable, Codable, Sendable {
         self.preferredReminderMinutes = try c.decodeIfPresent(Int.self, forKey: .preferredReminderMinutes).map { min(max($0, 0), 1439) }
         self.extraEarlyReminderDaysByCategory = try c.decodeIfPresent([String: Int].self, forKey: .extraEarlyReminderDaysByCategory) ?? [:]
         self.useCalendarForReschedule = try c.decodeIfPresent(Bool.self, forKey: .useCalendarForReschedule) ?? false
+        self.budgetOpeningSpentByPeriod = try c.decodeIfPresent([String: Int64].self, forKey: .budgetOpeningSpentByPeriod) ?? [:]
     }
 }
