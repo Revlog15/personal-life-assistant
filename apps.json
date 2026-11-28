@@ -19,6 +19,15 @@
       "screenshotURLs": [],
       "versions": [
         {
+          "version": "2.6.0",
+          "buildVersion": "28",
+          "date": "2026-11-28",
+          "localizedDescription": "feat(launch): add developer logo splash screen with royal tagline and zero-flash launch background (v2.6.0)",
+          "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.6.0/PLAApp-2.6.0.ipa",
+          "size": 3746749,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "2.5.0",
           "buildVersion": "26",
           "date": "2026-11-28",
@@ -100,7 +109,7 @@
           "minOSVersion": "17.0"
         }
       ],
-      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.5.0/PLAApp-2.5.0.ipa"
+      "downloadURL": "https://github.com/Revlog15/personal-life-assistant/releases/download/v2.6.0/PLAApp-2.6.0.ipa"
     }
   ],
   "news": []
